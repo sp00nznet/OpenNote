@@ -14,7 +14,7 @@ BOOL App_Initialize(HINSTANCE hInstance) {
     g_app->wordWrap = FALSE;
     g_app->showStatusBar = TRUE;
     g_app->alwaysOnTop = FALSE;
-    g_app->autoSaveOnExit = FALSE;
+    g_app->autoSaveSession = FALSE;
     g_app->tabSize = 4;
     g_app->zoomLevel = 100;
     g_app->wrapAround = TRUE;
@@ -76,7 +76,7 @@ void App_Shutdown(void) {
     if (!g_app) return;
 
     // Save session if auto-save is enabled
-    if (g_app->autoSaveOnExit) {
+    if (g_app->autoSaveSession) {
         App_SaveSession();
     }
 
@@ -177,7 +177,7 @@ void App_LoadSettings(void) {
             } else if (strcmp(key, "always_on_top") == 0) {
                 g_app->alwaysOnTop = atoi(value);
             } else if (strcmp(key, "auto_save_on_exit") == 0) {
-                g_app->autoSaveOnExit = atoi(value);
+                g_app->autoSaveSession = atoi(value);
             } else if (strcmp(key, "minimize_to_tray") == 0) {
                 g_app->minimizeToTray = atoi(value);
             } else if (strcmp(key, "tab_size") == 0) {
@@ -229,7 +229,7 @@ void App_SaveSettings(void) {
     snprintf(sql, sizeof(sql), "INSERT OR REPLACE INTO settings (key, value) VALUES ('always_on_top', '%d')", g_app->alwaysOnTop);
     Database_Execute(sql);
 
-    snprintf(sql, sizeof(sql), "INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_save_on_exit', '%d')", g_app->autoSaveOnExit);
+    snprintf(sql, sizeof(sql), "INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_save_on_exit', '%d')", g_app->autoSaveSession);
     Database_Execute(sql);
 
     snprintf(sql, sizeof(sql), "INSERT OR REPLACE INTO settings (key, value) VALUES ('minimize_to_tray', '%d')", g_app->minimizeToTray);

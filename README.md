@@ -20,30 +20,52 @@
 
 ---
 
-## ✨ Features
+## Screenshots
+
+<!-- Add your screenshots here -->
+| Main Editor | Notes Browser |
+|-------------|---------------|
+| ![Main Editor](screenshots/editor.png) | ![Notes Browser](screenshots/notes-browser.png) |
+
+| Syntax Highlighting | Cloud Sync |
+|---------------------|------------|
+| ![Syntax Highlighting](screenshots/syntax-highlighting.png) | ![Cloud Sync](screenshots/cloud-sync.png) |
+
+---
+
+## Features
 
 | Feature | Description |
 |---------|-------------|
 | **Tabbed Interface** | Work with multiple documents simultaneously |
+| **Syntax Highlighting** | Language-aware highlighting for 100+ languages |
 | **SQLite Notes** | Store notes in a local database with full-text search |
+| **Cloud Sync** | Sync notes with GitHub or Google Drive |
 | **Session Restore** | Auto-save and restore your workspace |
 | **Side-by-Side Compare** | Visual diff between any two open documents |
-| **Print Preview** | Preview documents before printing |
-| **System Tray** | Minimize to tray for quick access |
-| **Shell Integration** | Run selected text in CMD or PowerShell |
+| **Shell Integration** | Run selected text in CMD or PowerShell (with admin) |
 | **Cross-Tab Search** | Find and replace across all open tabs |
 
+### Syntax Highlighting
+
+OpenNote uses the Scintilla editor with Lexilla for powerful syntax highlighting:
+
+- **Languages**: C, C++, C#, Java, Python, JavaScript, TypeScript, Go, Rust, Ruby, PHP, SQL, HTML, CSS, JSON, XML, YAML, Markdown, and 100+ more
+- **Themes**: Light and dark color schemes
+- **Auto-detection**: Automatically detects language from file extension
+
 ### Core Editing
-- Rich text editing powered by Scintilla
-- Find & Replace with regex support
+- Find & Replace with match case and whole word options
 - Word wrap, zoom, and customizable fonts
 - Multi-level undo/redo history
+- Go to line (Ctrl+G)
 
 ### Notes Database
 - SQLite storage with FTS5 full-text search
 - Notes browser with search and file size display
 - Import files to notes, export notes to files
 - Rename and organize your notes
+- Cloud sync with GitHub or Google Drive
 
 ### Keyboard Shortcuts
 
@@ -58,7 +80,7 @@
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Clone the repository
@@ -79,7 +101,37 @@ See [BUILDING.md](BUILDING.md) for detailed build instructions.
 
 ---
 
-## 📁 Project Structure
+## Cloud Sync Setup
+
+To enable cloud sync, you need to configure API keys:
+
+### GitHub Sync
+1. Create a GitHub OAuth App at https://github.com/settings/developers
+2. Set the callback URL to `http://localhost:8080/callback`
+3. Add your credentials to the build (see CI/CD variables below)
+
+### Google Drive Sync
+1. Create a Google Cloud project at https://console.cloud.google.com
+2. Enable the Google Drive API
+3. Create OAuth 2.0 credentials
+4. Add your credentials to the build
+
+### CI/CD Variables (GitLab)
+
+Configure these in **Settings > CI/CD > Variables**:
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_CLIENT_ID` | GitHub OAuth App Client ID |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth App Client Secret |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
+
+> **Note:** The app builds and runs without API keys - cloud sync will simply be disabled.
+
+---
+
+## Project Structure
 
 ```
 OpenNote/
@@ -88,7 +140,7 @@ OpenNote/
 │   ├── core/      # Document, file I/O, search
 │   └── db/        # SQLite, notes repository
 ├── res/           # Resources (icons, dialogs)
-├── lib/           # Third-party (SQLite)
+├── lib/           # Third-party (SQLite, Scintilla)
 └── include/       # Headers
 ```
 
@@ -96,18 +148,18 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed documentation.
 
 ---
 
-## 🔧 Configuration
+## Configuration
 
 Settings are stored in `%APPDATA%\OpenNote\opennote.db`
 
 - **Auto-save Session** - Save all tabs on exit
-- **Minimize to Tray** - Keep running in system tray
 - **Default Font Size** - Set preferred editor font size
-- **Theme** - Light or dark mode
+- **Theme** - Light or dark color scheme
+- **Cloud Sync** - Connect GitHub or Google Drive account
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Please open an issue or pull request.
 
@@ -119,12 +171,12 @@ Contributions welcome! Please open an issue or pull request.
 
 ---
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
 <p align="center">
-  Made with ❤️ for Windows power users
+  Made with C and Win32 for Windows power users
 </p>

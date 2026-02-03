@@ -22,9 +22,12 @@ struct AppState {
     BOOL wordWrap;
     BOOL showStatusBar;
     BOOL alwaysOnTop;
-    BOOL autoSaveOnExit;    // Save session on exit
+    BOOL autoSaveSession;   // Save session on exit
     BOOL minimizeToTray;    // Minimize to system tray
     int tabSize;
+
+    // Cloud sync
+    WCHAR* syncProvider;    // "GitHub" or "Google Drive" or NULL
     int zoomLevel;      // 100 = 100%
     int themeIndex;     // Editor color theme
     LOGFONTW editorFont;

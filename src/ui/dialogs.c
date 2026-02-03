@@ -468,25 +468,99 @@ INT_PTR CALLBACK NotesBrowserProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
 
                 case IDC_NOTES_DELETE:
                     {
-                        int sel = ListView_GetNextItem(hList, -1, LVNI_SELECTED);
-                        if (sel >= 0) {
-                            LVITEMW item = { .mask = LVIF_PARAM, .iItem = sel };
-                            ListView_GetItem(hList, &item);
-                            if (MessageBoxW(hwnd, L"Delete this note?", APP_NAME, MB_YESNO | MB_ICONQUESTION) == IDYES) {
-                                Notes_Delete((int)item.lParam);
-                                ListView_DeleteItem(hList, sel);
+                        // Count selected items
+                        int selCount = ListView_GetSelectedCount(hList);
+                        if (selCount > 0) {
+                            WCHAR msg[128];
+                            if (selCount == 1) {
+                                wcscpy_s(msg, 128, L"Delete this note?");
+                            } else {
+                                swprintf_s(msg, 128, L"Delete %d selected notes?", selCount);
                             }
+
+                            if (MessageBoxW(hwnd, msg, APP_NAME, MB_YESNO | MB_ICONQUESTION) == IDYES) {
+                                // Delete from end to start to avoid index shifting
+                                int sel = -1;
+                                int* toDelete = (int*)malloc(selCount * sizeof(int));
+                                int* noteIds = (int*)malloc(selCount * sizeof(int));
+                                int idx = 0;
+
+                                while ((sel = ListView_GetNextItem(hList, sel, LVNI_SELECTED)) != -1) {
+                                    LVITEMW item = { .mask = LVIF_PARAM, .iItem = sel };
+                                    ListView_GetItem(hList, &item);
+                                    toDelete[idx] = sel;
+                                    noteIds[idx] = (int)item.lParam;
+                                    idx++;
+                                }
+
+                                // Delete from end to start
+                                for (int i = idx - 1; i >= 0; i--) {
+                                    Notes_Delete(noteIds[i]);
+                                    ListView_DeleteItem(hList, toDelete[i]);
+                                }
+
+                                free(toDelete);
+                                free(noteIds);
+                            }
+                        }
+                    }
+                    return TRUE;
+
+                case IDC_NOTES_SYNC:
+                    {
+                        // Check if user is signed in
+                        if (!g_app->syncProvider || g_app->syncProvider[0] == L'\0') {
+                            MessageBoxW(hwnd, L"Please sign in to a cloud account first.\n\nGo to Settings > Default Settings > Sync Accounts to connect.",
+                                        APP_NAME, MB_ICONINFORMATION);
+                        } else {
+                            // TODO: Implement actual sync
+                            WCHAR msg[256];
+                            swprintf_s(msg, 256, L"Syncing notes with %s...\n\nThis feature is coming soon!", g_app->syncProvider);
+                            MessageBoxW(hwnd, msg, APP_NAME, MB_ICONINFORMATION);
                         }
                     }
                     return TRUE;
 
                 case IDOK:
                     {
-                        int sel = ListView_GetNextItem(hList, -1, LVNI_SELECTED);
-                        if (sel >= 0) {
-                            LVITEMW item = { .mask = LVIF_PARAM, .iItem = sel };
-                            ListView_GetItem(hList, &item);
-                            *pNoteId = (int)item.lParam;
+                        int selCount = ListView_GetSelectedCount(hList);
+                        if (selCount == 1) {
+                            // Single selection - return the note ID
+                            int sel = ListView_GetNextItem(hList, -1, LVNI_SELECTED);
+                            if (sel >= 0) {
+                                LVITEMW item = { .mask = LVIF_PARAM, .iItem = sel };
+                                ListView_GetItem(hList, &item);
+                                *pNoteId = (int)item.lParam;
+                                EndDialog(hwnd, IDOK);
+                            }
+                        } else if (selCount > 1) {
+                            // Multi-selection - open all notes directly
+                            int sel = -1;
+                            BOOL first = TRUE;
+                            while ((sel = ListView_GetNextItem(hList, sel, LVNI_SELECTED)) != -1) {
+                                LVITEMW item = { .mask = LVIF_PARAM, .iItem = sel };
+                                ListView_GetItem(hList, &item);
+                                int noteId = (int)item.lParam;
+
+                                // Open each note in a new tab
+                                Document* doc = Document_CreateFromNote(noteId);
+                                if (doc) {
+                                    int tabIdx = App_CreateTab(doc->noteTitle);
+                                    if (tabIdx >= 0 && g_app->tabs[tabIdx]) {
+                                        Document_Destroy(g_app->tabs[tabIdx]->document);
+                                        g_app->tabs[tabIdx]->document = doc;
+                                        Document_Load(doc, g_app->tabs[tabIdx]->hEditor);
+                                        TabControl_UpdateTabTitle(tabIdx);
+
+                                        if (first) {
+                                            *pNoteId = noteId;  // Return first for compatibility
+                                            first = FALSE;
+                                        }
+                                    } else {
+                                        Document_Destroy(doc);
+                                    }
+                                }
+                            }
                             EndDialog(hwnd, IDOK);
                         }
                     }
@@ -541,6 +615,9 @@ void Dialogs_Defaults(HWND hParent) {
     DialogBoxW(g_app->hInstance, MAKEINTRESOURCEW(IDD_DEFAULTS), hParent, DefaultsProc);
 }
 
+// Forward declaration for sync accounts dialog
+void Dialogs_SyncAccounts(HWND hParent);
+
 // Defaults dialog procedure
 INT_PTR CALLBACK DefaultsProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     (void)lParam;
@@ -577,11 +654,27 @@ INT_PTR CALLBACK DefaultsProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
                 // Minimize to tray checkbox
                 CheckDlgButton(hwnd, IDC_DEFAULTS_TRAY, g_app->minimizeToTray ? BST_CHECKED : BST_UNCHECKED);
+
+                // Auto-save session checkbox
+                CheckDlgButton(hwnd, IDC_DEFAULTS_AUTOSAVE, g_app->autoSaveSession ? BST_CHECKED : BST_UNCHECKED);
             }
             return TRUE;
 
         case WM_COMMAND:
             switch (LOWORD(wParam)) {
+                case IDC_DEFAULTS_RESTORE:
+                    // Restore previous session
+                    if (MessageBoxW(hwnd, L"Restore the previous session?\nThis will open all previously open tabs.",
+                                    APP_NAME, MB_YESNO | MB_ICONQUESTION) == IDYES) {
+                        EndDialog(hwnd, IDCANCEL);
+                        App_RestoreSession();
+                    }
+                    return TRUE;
+
+                case IDC_DEFAULTS_SYNC_ACCOUNTS:
+                    Dialogs_SyncAccounts(hwnd);
+                    return TRUE;
+
                 case IDOK:
                     {
                         // Get font size
@@ -625,6 +718,9 @@ INT_PTR CALLBACK DefaultsProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
                         // Get minimize to tray setting
                         g_app->minimizeToTray = (IsDlgButtonChecked(hwnd, IDC_DEFAULTS_TRAY) == BST_CHECKED);
+
+                        // Get auto-save session setting
+                        g_app->autoSaveSession = (IsDlgButtonChecked(hwnd, IDC_DEFAULTS_AUTOSAVE) == BST_CHECKED);
 
                         EndDialog(hwnd, IDOK);
                     }
@@ -1382,4 +1478,85 @@ void Dialogs_PrintPreview(HWND hParent, HWND hEditor) {
     }
 
     if (data.text) free(data.text);
+}
+
+// Sync Accounts dialog procedure
+static INT_PTR CALLBACK SyncAccountsProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    (void)lParam;
+
+    switch (msg) {
+        case WM_INITDIALOG:
+            {
+                // Update status and button states based on current sync state
+                if (g_app->syncProvider && g_app->syncProvider[0] != L'\0') {
+                    WCHAR status[256];
+                    swprintf_s(status, 256, L"Signed in with %s", g_app->syncProvider);
+                    SetDlgItemTextW(hwnd, IDC_SYNC_STATUS, status);
+                    EnableWindow(GetDlgItem(hwnd, IDC_SYNC_SIGNOUT), TRUE);
+                    EnableWindow(GetDlgItem(hwnd, IDC_SYNC_GITHUB), FALSE);
+                    EnableWindow(GetDlgItem(hwnd, IDC_SYNC_GOOGLE), FALSE);
+                } else {
+                    SetDlgItemTextW(hwnd, IDC_SYNC_STATUS, L"Not signed in");
+                    EnableWindow(GetDlgItem(hwnd, IDC_SYNC_SIGNOUT), FALSE);
+                }
+            }
+            return TRUE;
+
+        case WM_COMMAND:
+            switch (LOWORD(wParam)) {
+                case IDC_SYNC_GITHUB:
+                    {
+                        // Check if GitHub API keys are configured
+                        #ifdef GITHUB_CLIENT_ID
+                        // TODO: Implement OAuth flow
+                        // For now, show placeholder
+                        MessageBoxW(hwnd, L"GitHub sign-in will open in your browser.\n\nThis feature is coming soon!",
+                                    APP_NAME, MB_ICONINFORMATION);
+                        #else
+                        MessageBoxW(hwnd, L"GitHub sync is not configured in this build.\n\nAPI keys required.",
+                                    APP_NAME, MB_ICONWARNING);
+                        #endif
+                    }
+                    return TRUE;
+
+                case IDC_SYNC_GOOGLE:
+                    {
+                        // Check if Google API keys are configured
+                        #ifdef GOOGLE_CLIENT_ID
+                        // TODO: Implement OAuth flow
+                        MessageBoxW(hwnd, L"Google Drive sign-in will open in your browser.\n\nThis feature is coming soon!",
+                                    APP_NAME, MB_ICONINFORMATION);
+                        #else
+                        MessageBoxW(hwnd, L"Google Drive sync is not configured in this build.\n\nAPI keys required.",
+                                    APP_NAME, MB_ICONWARNING);
+                        #endif
+                    }
+                    return TRUE;
+
+                case IDC_SYNC_SIGNOUT:
+                    if (MessageBoxW(hwnd, L"Sign out from cloud sync?", APP_NAME, MB_YESNO | MB_ICONQUESTION) == IDYES) {
+                        // Clear sync provider
+                        if (g_app->syncProvider) {
+                            free(g_app->syncProvider);
+                            g_app->syncProvider = NULL;
+                        }
+                        SetDlgItemTextW(hwnd, IDC_SYNC_STATUS, L"Not signed in");
+                        EnableWindow(GetDlgItem(hwnd, IDC_SYNC_SIGNOUT), FALSE);
+                        EnableWindow(GetDlgItem(hwnd, IDC_SYNC_GITHUB), TRUE);
+                        EnableWindow(GetDlgItem(hwnd, IDC_SYNC_GOOGLE), TRUE);
+                    }
+                    return TRUE;
+
+                case IDCANCEL:
+                    EndDialog(hwnd, IDCANCEL);
+                    return TRUE;
+            }
+            break;
+    }
+    return FALSE;
+}
+
+// Show sync accounts dialog
+void Dialogs_SyncAccounts(HWND hParent) {
+    DialogBoxW(g_app->hInstance, MAKEINTRESOURCEW(IDD_SYNC_ACCOUNTS), hParent, SyncAccountsProc);
 }
