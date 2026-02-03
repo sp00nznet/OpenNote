@@ -197,19 +197,29 @@ static void SaveNoteGistId(int noteId, const char* gistId) {
 
 // Upload a note as a GitHub Gist
 BOOL GitHubSync_UploadNote(int noteId, const WCHAR* title, const WCHAR* content) {
-    // Convert to UTF-8
+    // Convert title to UTF-8
     char titleUtf8[MAX_TITLE_LEN * 3];
-    char contentUtf8[1024 * 1024]; // 1MB max
     WideCharToMultiByte(CP_UTF8, 0, title, -1, titleUtf8, sizeof(titleUtf8), NULL, NULL);
-    WideCharToMultiByte(CP_UTF8, 0, content, -1, contentUtf8, sizeof(contentUtf8), NULL, NULL);
+
+    // Convert content to UTF-8 (heap allocated)
+    int contentUtf8Len = WideCharToMultiByte(CP_UTF8, 0, content, -1, NULL, 0, NULL, NULL);
+    if (contentUtf8Len <= 0) return FALSE;
+
+    char* contentUtf8 = (char*)malloc(contentUtf8Len);
+    if (!contentUtf8) return FALSE;
+    WideCharToMultiByte(CP_UTF8, 0, content, -1, contentUtf8, contentUtf8Len, NULL, NULL);
 
     // Escape for JSON
     char titleEscaped[MAX_TITLE_LEN * 6];
     char* contentEscaped = (char*)malloc(strlen(contentUtf8) * 2 + 1);
-    if (!contentEscaped) return FALSE;
+    if (!contentEscaped) {
+        free(contentUtf8);
+        return FALSE;
+    }
 
     JsonEscape(titleUtf8, titleEscaped, sizeof(titleEscaped));
     JsonEscape(contentUtf8, contentEscaped, (int)(strlen(contentUtf8) * 2 + 1));
+    free(contentUtf8);
 
     // Build filename (use title with .md extension)
     char filename[MAX_TITLE_LEN * 3 + 4];
