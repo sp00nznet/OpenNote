@@ -18,18 +18,17 @@
 
 > A modern, lightweight tabbed text editor for Windows with SQLite-based note storage. Built as a Notepad replacement with enhanced features for power users.
 
+## Download
+
+**[Download Latest Release](https://sp00.nz/releases/OpenNote/)**
+
 ---
 
 ## Screenshots
 
-<!-- Add your screenshots here -->
 | Main Editor | Notes Browser |
 |-------------|---------------|
-| ![Main Editor](screenshots/editor.png) | ![Notes Browser](screenshots/notes-browser.png) |
-
-| Syntax Highlighting | Cloud Sync |
-|---------------------|------------|
-| ![Syntax Highlighting](screenshots/syntax-highlighting.png) | ![Cloud Sync](screenshots/cloud-sync.png) |
+| ![Main Editor](gfx/main-editor.png) | ![Notes Browser](gfx/notes-browser.png) |
 
 ---
 
@@ -45,14 +44,6 @@
 | **Side-by-Side Compare** | Visual diff between any two open documents |
 | **Shell Integration** | Run selected text in CMD or PowerShell (with admin) |
 | **Cross-Tab Search** | Find and replace across all open tabs |
-
-### Syntax Highlighting
-
-OpenNote uses the Scintilla editor with Lexilla for powerful syntax highlighting:
-
-- **Languages**: C, C++, C#, Java, Python, JavaScript, TypeScript, Go, Rust, Ruby, PHP, SQL, HTML, CSS, JSON, XML, YAML, Markdown, and 100+ more
-- **Themes**: Light and dark color schemes
-- **Auto-detection**: Automatically detects language from file extension
 
 ### Core Editing
 - Find & Replace with match case and whole word options
@@ -101,36 +92,6 @@ See [BUILDING.md](BUILDING.md) for detailed build instructions.
 
 ---
 
-## Cloud Sync Setup
-
-To enable cloud sync, you need to configure API keys:
-
-### GitHub Sync
-1. Create a GitHub OAuth App at https://github.com/settings/developers
-2. Set the callback URL to `http://localhost:8080/callback`
-3. Add your credentials to the build (see CI/CD variables below)
-
-### Google Drive Sync
-1. Create a Google Cloud project at https://console.cloud.google.com
-2. Enable the Google Drive API
-3. Create OAuth 2.0 credentials
-4. Add your credentials to the build
-
-### CI/CD Variables (GitLab)
-
-Configure these in **Settings > CI/CD > Variables**:
-
-| Variable | Description |
-|----------|-------------|
-| `GITHUB_CLIENT_ID` | GitHub OAuth App Client ID |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth App Client Secret |
-| `GOOGLE_CLIENT_ID` | Google OAuth Client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
-
-> **Note:** The app builds and runs without API keys - cloud sync will simply be disabled.
-
----
-
 ## Project Structure
 
 ```
@@ -138,10 +99,12 @@ OpenNote/
 ├── src/           # Source code
 │   ├── ui/        # Window, tabs, dialogs
 │   ├── core/      # Document, file I/O, search
-│   └── db/        # SQLite, notes repository
+│   ├── db/        # SQLite, notes repository
+│   └── sync/      # OAuth, cloud sync
 ├── res/           # Resources (icons, dialogs)
 ├── lib/           # Third-party (SQLite, Scintilla)
-└── include/       # Headers
+├── include/       # Headers
+└── docs/          # Documentation
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed documentation.
