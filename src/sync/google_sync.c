@@ -27,7 +27,7 @@ static BOOL GetGoogleToken(char* tokenOut, int tokenSize) {
 // Make Google Drive API request
 static BOOL GoogleAPI_Request(const WCHAR* method, const WCHAR* path, const char* body,
                                const char* contentType, char* responseOut, int responseSize, int* httpStatusOut) {
-    char token[512];
+    char token[1024];
     if (!GetGoogleToken(token, sizeof(token))) {
         return FALSE;
     }
@@ -52,8 +52,8 @@ static BOOL GoogleAPI_Request(const WCHAR* method, const WCHAR* path, const char
     }
 
     // Build auth header
-    WCHAR authHeader[768];
-    WCHAR tokenW[512];
+    WCHAR authHeader[1280];
+    WCHAR tokenW[1024];
     MultiByteToWideChar(CP_UTF8, 0, token, -1, tokenW, 512);
     swprintf_s(authHeader, 768, L"Authorization: Bearer %s", tokenW);
     WinHttpAddRequestHeaders(hRequest, authHeader, -1, WINHTTP_ADDREQ_FLAG_ADD);
