@@ -6,17 +6,16 @@ stages:
 variables:
   CMAKE_BUILD_TYPE: Release
   # Cloud sync API keys (optional - app builds without them)
-  # GITHUB_CLIENT_ID: ""
-  # GITHUB_CLIENT_SECRET: ""
-  # GOOGLE_CLIENT_ID: ""
-  # GOOGLE_CLIENT_SECRET: ""
+  # Set these in GitLab CI/CD Variables:
+  # GH_OAUTH_CLIENT_ID, GH_OAUTH_CLIENT_SECRET
+  # GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 
 build:
   stage: build
   tags:
     - windows
   script:
-    - cmake -B build -G "Visual Studio 17 2022" -A x64 -DGITHUB_CLIENT_ID="$GITHUB_CLIENT_ID" -DGITHUB_CLIENT_SECRET="$GITHUB_CLIENT_SECRET" -DGOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" -DGOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET"
+    - cmake -B build -G "Visual Studio 17 2022" -A x64 -DGH_OAUTH_CLIENT_ID="$env:GH_OAUTH_CLIENT_ID" -DGH_OAUTH_CLIENT_SECRET="$env:GH_OAUTH_CLIENT_SECRET" -DGOOGLE_CLIENT_ID="$env:GOOGLE_CLIENT_ID" -DGOOGLE_CLIENT_SECRET="$env:GOOGLE_CLIENT_SECRET"
     - cmake --build build --config Release
   artifacts:
     paths:

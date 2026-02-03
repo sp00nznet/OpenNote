@@ -95,6 +95,20 @@ target_compile_definitions(OpenNote PRIVATE
     WIN32_LEAN_AND_MEAN
 )
 
+# OAuth credentials (optional - passed from CI/CD)
+if(GH_OAUTH_CLIENT_ID)
+    target_compile_definitions(OpenNote PRIVATE GITHUB_CLIENT_ID="${GH_OAUTH_CLIENT_ID}")
+endif()
+if(GH_OAUTH_CLIENT_SECRET)
+    target_compile_definitions(OpenNote PRIVATE GITHUB_CLIENT_SECRET="${GH_OAUTH_CLIENT_SECRET}")
+endif()
+if(GOOGLE_CLIENT_ID)
+    target_compile_definitions(OpenNote PRIVATE GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}")
+endif()
+if(GOOGLE_CLIENT_SECRET)
+    target_compile_definitions(OpenNote PRIVATE GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}")
+endif()
+
 # Enable warnings
 if(MSVC)
     target_compile_options(OpenNote PRIVATE /W4)

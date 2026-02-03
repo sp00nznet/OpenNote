@@ -23,6 +23,7 @@ struct AppState {
     BOOL showStatusBar;
     BOOL alwaysOnTop;
     BOOL autoSaveSession;   // Save session on exit
+    BOOL autoRestoreSession; // Restore session on startup
     BOOL minimizeToTray;    // Minimize to system tray
     int tabSize;
 
