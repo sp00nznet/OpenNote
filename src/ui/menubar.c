@@ -76,6 +76,7 @@ HMENU MenuBar_Create(void) {
     AppendMenuW(hViewMenu, MF_STRING, IDM_VIEW_STATUSBAR, L"&Status Bar");
     AppendMenuW(hViewMenu, MF_SEPARATOR, 0, NULL);
     AppendMenuW(hViewMenu, MF_STRING, IDM_VIEW_NOTES_BROWSER, L"&Notes Browser...");
+    AppendMenuW(hViewMenu, MF_STRING, IDM_VIEW_PREVIEW, L"&Markdown Preview\tF6");
     AppendMenuW(hViewMenu, MF_SEPARATOR, 0, NULL);
     AppendMenuW(hViewMenu, MF_STRING, IDM_VIEW_ALWAYS_ON_TOP, L"&Always on Top");
     AppendMenuW(hMenu, MF_POPUP, (UINT_PTR)hViewMenu, L"&View");

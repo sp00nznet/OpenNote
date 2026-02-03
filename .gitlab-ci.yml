@@ -1,6 +1,7 @@
 stages:
   - build
   - package
+  - deploy
 
 variables:
   CMAKE_BUILD_TYPE: Release
@@ -56,4 +57,21 @@ package:
       - dist/
     expire_in: 30 days
   rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+deploy:
+  stage: deploy
+  tags:
+    - windows
+  needs:
+    - job: build
+      artifacts: true
+  script:
+    - 'net use R: \\192.168.100.22\releases gitlab /user:root'
+    - '$destPath = "R:\$env:CI_PROJECT_NAME\$env:CI_COMMIT_REF_NAME"'
+    - 'if (-not (Test-Path $destPath)) { New-Item -ItemType Directory -Path $destPath -Force }'
+    - 'Copy-Item -Path "build\bin\OpenNote.exe" -Destination $destPath -Force'
+    - 'net use R: /delete'
+  rules:
+    - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"

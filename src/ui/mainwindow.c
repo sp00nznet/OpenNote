@@ -863,6 +863,15 @@ void MainWindow_OnCommand(HWND hwnd, int id, HWND hwndCtl, UINT codeNotify) {
                          0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
             break;
 
+        case IDM_VIEW_PREVIEW:
+            {
+                Tab* tab = App_GetActiveTab();
+                if (tab && tab->hEditor) {
+                    Dialogs_MarkdownPreview(hwnd, tab->hEditor);
+                }
+            }
+            break;
+
         // Settings menu
         case IDM_SETTINGS_DEFAULTS:
             Dialogs_Defaults(hwnd);

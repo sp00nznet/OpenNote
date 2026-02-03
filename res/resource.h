@@ -55,6 +55,7 @@
 #define IDM_VIEW_STATUSBAR      4004
 #define IDM_VIEW_NOTES_BROWSER  4005
 #define IDM_VIEW_ALWAYS_ON_TOP  4006
+#define IDM_VIEW_PREVIEW        4007
 
 // Settings menu
 #define IDM_SETTINGS_AUTOSAVE   5501

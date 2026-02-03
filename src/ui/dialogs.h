@@ -26,6 +26,9 @@ BOOL Dialogs_InputBox(HWND hParent, const WCHAR* title, const WCHAR* prompt, WCH
 // Print preview
 void Dialogs_PrintPreview(HWND hParent, HWND hEditor);
 
+// Markdown preview
+void Dialogs_MarkdownPreview(HWND hParent, HWND hEditor);
+
 // Dialog procedures
 INT_PTR CALLBACK GoToLineProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK AboutProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
