@@ -47,20 +47,32 @@ package:
   needs:
     - build
   script:
-    # Install Inno Setup if not present
+    # Check what we have from build
+    - Write-Host "=== Checking build artifacts ==="
+    - Get-ChildItem -Recurse build\bin -ErrorAction SilentlyContinue
+    # Install Inno Setup
+    - Write-Host "=== Installing Inno Setup ==="
+    - choco install innosetup -y --no-progress
+    - $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
     - |
-      if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
-        Write-Host "Installing Inno Setup..."
-        choco install innosetup -y --no-progress
+      if (-not (Test-Path $isccPath)) {
+        Write-Host "ERROR: ISCC.exe not found at $isccPath"
+        Get-ChildItem "C:\Program Files (x86)" -Directory | Where-Object { $_.Name -like "*Inno*" }
+        exit 1
       }
     # Create output directory
     - New-Item -ItemType Directory -Force -Path build\installer
     # Build the installer
-    - '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\OpenNoteSetup.iss'
+    - Write-Host "=== Building installer ==="
+    - '& $isccPath installer\OpenNoteSetup.iss'
+    - Write-Host "=== Checking installer output ==="
+    - Get-ChildItem build\installer -ErrorAction SilentlyContinue
     # Create dist folder with both exe and installer
     - New-Item -ItemType Directory -Force -Path dist
     - Copy-Item -Path build\bin\OpenNote.exe -Destination dist\ -Force
     - Copy-Item -Path build\installer\OpenNoteSetup.exe -Destination dist\ -Force
+    - Write-Host "=== Final dist contents ==="
+    - Get-ChildItem dist
   artifacts:
     name: "OpenNote-${CI_COMMIT_SHORT_SHA}"
     paths:
