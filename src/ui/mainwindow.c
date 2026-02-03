@@ -2,11 +2,38 @@
 #include "res/resource.h"
 #include <windowsx.h>
 #include <Scintilla.h>
+#include <shellapi.h>
 
 // Window procedure forward declaration
 static void OnCreate(HWND hwnd);
 static void OnDestroy(HWND hwnd);
 static void OnNotify(HWND hwnd, int idCtrl, LPNMHDR pnmh);
+
+// System tray
+static NOTIFYICONDATAW g_trayIcon = {0};
+static BOOL g_trayIconVisible = FALSE;
+
+static void TrayIcon_Add(HWND hwnd) {
+    if (g_trayIconVisible) return;
+
+    g_trayIcon.cbSize = sizeof(g_trayIcon);
+    g_trayIcon.hWnd = hwnd;
+    g_trayIcon.uID = 1;
+    g_trayIcon.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    g_trayIcon.uCallbackMessage = WM_APP_TRAY_CALLBACK;
+    g_trayIcon.hIcon = LoadIconW(g_app->hInstance, MAKEINTRESOURCEW(IDI_SUPERNOTE));
+    wcscpy_s(g_trayIcon.szTip, 128, APP_NAME);
+
+    Shell_NotifyIconW(NIM_ADD, &g_trayIcon);
+    g_trayIconVisible = TRUE;
+}
+
+static void TrayIcon_Remove(void) {
+    if (!g_trayIconVisible) return;
+
+    Shell_NotifyIconW(NIM_DELETE, &g_trayIcon);
+    g_trayIconVisible = FALSE;
+}
 
 // Register window class
 BOOL MainWindow_RegisterClass(HINSTANCE hInstance) {
@@ -77,6 +104,36 @@ LRESULT CALLBACK MainWindow_WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             OnNotify(hwnd, (int)wParam, (LPNMHDR)lParam);
             return 0;
 
+        case WM_PARENTNOTIFY:
+            // Handle double-click on tab control empty area
+            if (LOWORD(wParam) == WM_LBUTTONDOWN) {
+                POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+                HWND hChild = ChildWindowFromPoint(hwnd, pt);
+                if (hChild == g_app->hTabControl) {
+                    // Click is on tab control - check if on empty area
+                    POINT ptTab = pt;
+                    MapWindowPoints(hwnd, g_app->hTabControl, &ptTab, 1);
+                    TCHITTESTINFO hti = { .pt = ptTab };
+                    int hitTab = (int)SendMessageW(g_app->hTabControl, TCM_HITTEST, 0, (LPARAM)&hti);
+                    if (hitTab == -1) {
+                        // Check for double-click timing
+                        static DWORD lastClick = 0;
+                        static POINT lastPt = {0, 0};
+                        DWORD now = GetTickCount();
+                        if ((now - lastClick) <= GetDoubleClickTime() &&
+                            abs(pt.x - lastPt.x) <= GetSystemMetrics(SM_CXDOUBLECLK) &&
+                            abs(pt.y - lastPt.y) <= GetSystemMetrics(SM_CYDOUBLECLK)) {
+                            App_CreateTab(L"Untitled");
+                            lastClick = 0;
+                        } else {
+                            lastClick = now;
+                            lastPt = pt;
+                        }
+                    }
+                }
+            }
+            break;
+
         case WM_SETFOCUS:
             // Forward focus to active editor
             {
@@ -146,6 +203,14 @@ LRESULT CALLBACK MainWindow_WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             }
             return 0;
 
+        case WM_APP_TRAY_CALLBACK:
+            if (lParam == WM_LBUTTONDBLCLK || lParam == WM_LBUTTONUP) {
+                TrayIcon_Remove();
+                ShowWindow(hwnd, SW_RESTORE);
+                SetForegroundWindow(hwnd);
+            }
+            return 0;
+
         case WM_APP_DOC_MODIFIED:
             {
                 Tab* tab = App_GetActiveTab();
@@ -162,10 +227,43 @@ LRESULT CALLBACK MainWindow_WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
     return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
 
+// New tab button handle
+static HWND g_hNewTabBtn = NULL;
+
+// Update position of the new tab button (call after adding/removing tabs)
+void MainWindow_UpdateNewTabButton(void) {
+    if (!g_hNewTabBtn || !g_app->hTabControl) return;
+
+    int btnWidth = 24;
+    int tabHeight = 24;
+    int btnX = 4;
+
+    int tabCount = (int)SendMessageW(g_app->hTabControl, TCM_GETITEMCOUNT, 0, 0);
+    if (tabCount > 0) {
+        RECT rcTab;
+        SendMessageW(g_app->hTabControl, TCM_GETITEMRECT, tabCount - 1, (LPARAM)&rcTab);
+        btnX = rcTab.right + 2;
+    }
+    SetWindowPos(g_hNewTabBtn, HWND_TOP, btnX, 2, btnWidth, tabHeight - 4, 0);
+}
+
 // Create child controls
 static void OnCreate(HWND hwnd) {
     // Create tab control
     g_app->hTabControl = TabControl_Create(hwnd);
+
+    // Create "+" button for new tab
+    g_hNewTabBtn = CreateWindowExW(
+        0, L"BUTTON", L"+",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+        0, 0, 24, 22,
+        hwnd, (HMENU)(INT_PTR)IDC_NEW_TAB_BTN,
+        g_app->hInstance, NULL
+    );
+    if (g_hNewTabBtn) {
+        // Use same font as tab control
+        SendMessageW(g_hNewTabBtn, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), TRUE);
+    }
 
     // Create status bar
     g_app->hStatusBar = StatusBar_Create(hwnd);
@@ -178,6 +276,7 @@ static void OnCreate(HWND hwnd) {
 // Cleanup on destroy
 static void OnDestroy(HWND hwnd) {
     (void)hwnd;
+    TrayIcon_Remove();
     KillTimer(hwnd, TIMER_STATUS_UPDATE);
     PostQuitMessage(0);
 }
@@ -197,14 +296,21 @@ static void HandleLinkClick(int position) {
 
     if (!link) return;
 
-    // Find the target tab
+    // Handle URL links - open in browser
+    if (link->targetType == LINK_TARGET_URL && link->targetURL[0]) {
+        ShellExecuteW(NULL, L"open", link->targetURL, NULL, NULL, SW_SHOWNORMAL);
+        Links_Free(link);
+        return;
+    }
+
+    // Find the target tab for file/note links
     for (int i = 0; i < MAX_TABS; i++) {
         if (!g_app->tabs[i] || !g_app->tabs[i]->document) continue;
 
         BOOL match = FALSE;
-        if (link->targetType == DOC_TYPE_FILE && g_app->tabs[i]->document->type == DOC_TYPE_FILE) {
+        if (link->targetType == LINK_TARGET_FILE && g_app->tabs[i]->document->type == DOC_TYPE_FILE) {
             match = (_wcsicmp(g_app->tabs[i]->document->filePath, link->targetPath) == 0);
-        } else if (link->targetType == DOC_TYPE_NOTE && g_app->tabs[i]->document->type == DOC_TYPE_NOTE) {
+        } else if (link->targetType == LINK_TARGET_NOTE && g_app->tabs[i]->document->type == DOC_TYPE_NOTE) {
             match = (g_app->tabs[i]->document->noteId == link->targetNoteId);
         }
 
@@ -232,6 +338,20 @@ static void OnNotify(HWND hwnd, int idCtrl, LPNMHDR pnmh) {
                     POINT pt;
                     GetCursorPos(&pt);
                     TabControl_OnRightClick(pt.x, pt.y);
+                }
+                break;
+            case NM_DBLCLK:
+                {
+                    // Double-click on empty area creates new tab
+                    POINT pt;
+                    GetCursorPos(&pt);
+                    ScreenToClient(g_app->hTabControl, &pt);
+                    TCHITTESTINFO hti = { .pt = pt };
+                    int hitTab = (int)SendMessageW(g_app->hTabControl, TCM_HITTEST, 0, (LPARAM)&hti);
+                    if (hitTab == -1) {
+                        // Clicked on empty space, create new tab
+                        App_CreateTab(L"Untitled");
+                    }
                 }
                 break;
         }
@@ -278,7 +398,13 @@ static void OnNotify(HWND hwnd, int idCtrl, LPNMHDR pnmh) {
 // Handle WM_SIZE
 void MainWindow_OnSize(HWND hwnd, UINT state, int cx, int cy) {
     (void)hwnd;
-    if (state == SIZE_MINIMIZED) return;
+    if (state == SIZE_MINIMIZED) {
+        if (g_app->minimizeToTray) {
+            TrayIcon_Add(hwnd);
+            ShowWindow(hwnd, SW_HIDE);
+        }
+        return;
+    }
 
     // Position status bar
     if (g_app->hStatusBar && g_app->showStatusBar) {
@@ -293,10 +419,22 @@ void MainWindow_OnSize(HWND hwnd, UINT state, int cx, int cy) {
         statusHeight = rcStatus.bottom - rcStatus.top;
     }
 
-    // Fixed tab control height
+    // Fixed tab control height and new tab button
     int tabHeight = 24;
+    int btnWidth = 24;
     if (g_app->hTabControl) {
         SetWindowPos(g_app->hTabControl, NULL, 0, 0, cx, tabHeight, SWP_NOZORDER);
+    }
+    if (g_hNewTabBtn) {
+        // Position button right after the last tab
+        int btnX = 4;  // Default position if no tabs
+        int tabCount = (int)SendMessageW(g_app->hTabControl, TCM_GETITEMCOUNT, 0, 0);
+        if (tabCount > 0) {
+            RECT rcTab;
+            SendMessageW(g_app->hTabControl, TCM_GETITEMRECT, tabCount - 1, (LPARAM)&rcTab);
+            btnX = rcTab.right + 2;
+        }
+        SetWindowPos(g_hNewTabBtn, HWND_TOP, btnX, 2, btnWidth, tabHeight - 4, 0);
     }
 
     // Position editor
@@ -352,6 +490,7 @@ void MainWindow_OnCommand(HWND hwnd, int id, HWND hwndCtl, UINT codeNotify) {
     switch (id) {
         // File menu
         case IDM_FILE_NEW:
+        case IDC_NEW_TAB_BTN:
             App_CreateTab(L"Untitled");
             break;
 
@@ -509,6 +648,12 @@ void MainWindow_OnCommand(HWND hwnd, int id, HWND hwndCtl, UINT codeNotify) {
 
                 if (pd.hDevMode) GlobalFree(pd.hDevMode);
                 if (pd.hDevNames) GlobalFree(pd.hDevNames);
+            }
+            break;
+
+        case IDM_FILE_PRINT_PREVIEW:
+            if (hEditor) {
+                Dialogs_PrintPreview(hwnd, hEditor);
             }
             break;
 
@@ -903,6 +1048,15 @@ void MainWindow_ShowEditorContextMenu(HWND hwnd, int x, int y) {
 
         AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
         AppendMenuW(hMenu, MF_POPUP, (UINT_PTR)hLinkMenu, L"&Link to");
+
+        // Send to Shell submenu
+        HMENU hShellMenu = CreatePopupMenu();
+        AppendMenuW(hShellMenu, MF_STRING, IDM_SHELL_CMD, L"Run in &CMD");
+        AppendMenuW(hShellMenu, MF_STRING, IDM_SHELL_CMD_ADMIN, L"Run in CMD (Admin)");
+        AppendMenuW(hShellMenu, MF_SEPARATOR, 0, NULL);
+        AppendMenuW(hShellMenu, MF_STRING, IDM_SHELL_POWERSHELL, L"Run in &PowerShell");
+        AppendMenuW(hShellMenu, MF_STRING, IDM_SHELL_PS_ADMIN, L"Run in PowerShell (Admin)");
+        AppendMenuW(hMenu, MF_POPUP, (UINT_PTR)hShellMenu, L"&Send to Shell");
     }
 
     int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON, x, y, 0, hwnd, NULL);
@@ -1008,6 +1162,75 @@ void MainWindow_ShowEditorContextMenu(HWND hwnd, int x, int y) {
 
                     free(selected);
                 }
+            }
+        }
+        // Handle shell commands
+        else if (cmd == IDM_SHELL_CMD || cmd == IDM_SHELL_POWERSHELL ||
+                 cmd == IDM_SHELL_CMD_ADMIN || cmd == IDM_SHELL_PS_ADMIN) {
+            WCHAR* selected = Editor_GetSelectedText(hEditor);
+            if (selected) {
+                // Trim whitespace
+                WCHAR* trimmed = selected;
+                while (*trimmed == L' ' || *trimmed == L'\t' || *trimmed == L'\r' || *trimmed == L'\n') trimmed++;
+                WCHAR* endTrim = trimmed + wcslen(trimmed) - 1;
+                while (endTrim > trimmed && (*endTrim == L' ' || *endTrim == L'\t' || *endTrim == L'\r' || *endTrim == L'\n')) {
+                    *endTrim = L'\0';
+                    endTrim--;
+                }
+
+                if (*trimmed) {
+                    BOOL isAdmin = (cmd == IDM_SHELL_CMD_ADMIN || cmd == IDM_SHELL_PS_ADMIN);
+                    BOOL isPowerShell = (cmd == IDM_SHELL_POWERSHELL || cmd == IDM_SHELL_PS_ADMIN);
+
+                    if (isAdmin) {
+                        // Use ShellExecuteEx with runas for admin elevation
+                        WCHAR params[MAX_PATH * 2];
+                        if (isPowerShell) {
+                            swprintf_s(params, MAX_PATH * 2, L"-NoExit -Command \"& '%s'\"", trimmed);
+                        } else {
+                            swprintf_s(params, MAX_PATH * 2, L"/c \"%s\" & pause", trimmed);
+                        }
+
+                        SHELLEXECUTEINFOW sei = {
+                            .cbSize = sizeof(sei),
+                            .fMask = SEE_MASK_NOCLOSEPROCESS,
+                            .hwnd = hwnd,
+                            .lpVerb = L"runas",
+                            .lpFile = isPowerShell ? L"powershell.exe" : L"cmd.exe",
+                            .lpParameters = params,
+                            .nShow = SW_SHOWNORMAL
+                        };
+
+                        if (!ShellExecuteExW(&sei)) {
+                            DWORD err = GetLastError();
+                            if (err != ERROR_CANCELLED) {
+                                MessageBoxW(hwnd, L"Failed to execute command as administrator.", APP_NAME, MB_ICONERROR);
+                            }
+                        } else if (sei.hProcess) {
+                            CloseHandle(sei.hProcess);
+                        }
+                    } else {
+                        // Regular execution
+                        WCHAR cmdLine[MAX_PATH * 2];
+                        if (isPowerShell) {
+                            swprintf_s(cmdLine, MAX_PATH * 2, L"powershell.exe -NoExit -Command \"& '%s'\"", trimmed);
+                        } else {
+                            swprintf_s(cmdLine, MAX_PATH * 2, L"cmd.exe /c \"%s\" & pause", trimmed);
+                        }
+
+                        STARTUPINFOW si = { .cb = sizeof(si) };
+                        PROCESS_INFORMATION pi = {0};
+
+                        if (CreateProcessW(NULL, cmdLine, NULL, NULL, FALSE,
+                                           CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi)) {
+                            CloseHandle(pi.hProcess);
+                            CloseHandle(pi.hThread);
+                        } else {
+                            MessageBoxW(hwnd, L"Failed to execute command.", APP_NAME, MB_ICONERROR);
+                        }
+                    }
+                }
+                free(selected);
             }
         }
         else {

@@ -20,8 +20,9 @@
 #define IDM_FILE_EXPORT         1008
 #define IDM_FILE_CLOSE_TAB      1009
 #define IDM_FILE_PRINT          1010
-#define IDM_FILE_PRINT_SETUP    1011
-#define IDM_FILE_EXIT           1012
+#define IDM_FILE_PRINT_PREVIEW  1011
+#define IDM_FILE_PRINT_SETUP    1012
+#define IDM_FILE_EXIT           1013
 
 // Edit menu
 #define IDM_EDIT_UNDO           2001
@@ -87,6 +88,10 @@
 #define IDM_SPELL_ADD_DICT      7210
 #define IDM_SPELL_IGNORE        7211
 #define IDM_SPELL_CHECK_DOC     7212
+#define IDM_SHELL_CMD           7220
+#define IDM_SHELL_POWERSHELL    7221
+#define IDM_SHELL_CMD_ADMIN     7222
+#define IDM_SHELL_PS_ADMIN      7223
 
 // Dialogs
 #define IDD_ABOUT               400
@@ -98,6 +103,8 @@
 #define IDD_DEFAULTS            406
 #define IDD_FIND_IN_TABS        407
 #define IDD_REPLACE_IN_TABS     408
+#define IDD_INPUTBOX            409
+#define IDD_PRINT_PREVIEW       410
 
 // Dialog controls
 #define IDC_STATIC              -1
@@ -124,6 +131,16 @@
 #define IDC_FIND_ALL_TABS       1120
 #define IDC_REPLACE_ALL_TABS    1121
 #define IDC_HIGHLIGHT_PERSIST   1123
+#define IDC_INPUTBOX_TEXT       1124
+#define IDC_INPUTBOX_PROMPT     1125
+#define IDC_DEFAULTS_TRAY       1126
+#define IDC_PREVIEW_CANVAS      1127
+#define IDC_PREVIEW_PREV        1128
+#define IDC_PREVIEW_NEXT        1129
+#define IDC_PREVIEW_PRINT       1130
+#define IDC_PREVIEW_PAGENUM     1131
+#define IDC_NOTES_RENAME        1132
+#define IDC_NEW_TAB_BTN         1133
 
 // Status bar parts
 #define SB_PART_MESSAGE         0
@@ -140,5 +157,6 @@
 #define WM_APP_UPDATE_STATUS    (WM_APP + 1)
 #define WM_APP_TAB_CHANGED      (WM_APP + 2)
 #define WM_APP_DOC_MODIFIED     (WM_APP + 3)
+#define WM_APP_TRAY_CALLBACK    (WM_APP + 4)
 
 #endif // RESOURCE_H

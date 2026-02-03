@@ -1,5 +1,47 @@
 #include "supernote.h"
 #include "res/resource.h"
+#include <windowsx.h>
+
+// Original tab control window proc
+static WNDPROC g_origTabProc = NULL;
+static DWORD g_lastClickTime = 0;
+static POINT g_lastClickPos = {0, 0};
+
+// Subclass procedure for tab control
+static LRESULT CALLBACK TabSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (msg == WM_LBUTTONDBLCLK || msg == WM_LBUTTONDOWN) {
+        POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+        TCHITTESTINFO hti = { .pt = pt };
+        int hitTab = (int)SendMessageW(hwnd, TCM_HITTEST, 0, (LPARAM)&hti);
+
+        if (hitTab == -1) {
+            // Click is on empty area
+            if (msg == WM_LBUTTONDBLCLK) {
+                // Direct double-click message
+                App_CreateTab(L"Untitled");
+                return 0;
+            } else {
+                // Check for manual double-click detection
+                DWORD now = GetTickCount();
+                DWORD dblClickTime = GetDoubleClickTime();
+                int cxDouble = GetSystemMetrics(SM_CXDOUBLECLK);
+                int cyDouble = GetSystemMetrics(SM_CYDOUBLECLK);
+
+                if ((now - g_lastClickTime) <= dblClickTime &&
+                    abs(pt.x - g_lastClickPos.x) <= cxDouble &&
+                    abs(pt.y - g_lastClickPos.y) <= cyDouble) {
+                    // This is a double-click
+                    App_CreateTab(L"Untitled");
+                    g_lastClickTime = 0;  // Reset
+                    return 0;
+                }
+                g_lastClickTime = now;
+                g_lastClickPos = pt;
+            }
+        }
+    }
+    return CallWindowProcW(g_origTabProc, hwnd, msg, wParam, lParam);
+}
 
 // Create tab control
 HWND TabControl_Create(HWND hParent) {
@@ -16,6 +58,13 @@ HWND TabControl_Create(HWND hParent) {
     );
 
     if (hTab) {
+        // Remove WS_EX_NOPARENTNOTIFY if present
+        LONG_PTR exStyle = GetWindowLongPtrW(hTab, GWL_EXSTYLE);
+        SetWindowLongPtrW(hTab, GWL_EXSTYLE, exStyle & ~WS_EX_NOPARENTNOTIFY);
+
+        // Subclass the tab control for double-click handling
+        g_origTabProc = (WNDPROC)SetWindowLongPtrW(hTab, GWLP_WNDPROC, (LONG_PTR)TabSubclassProc);
+
         // Create a smaller font for tabs
         HFONT hFont = CreateFontW(
             -11,                        // Height (negative = character height)

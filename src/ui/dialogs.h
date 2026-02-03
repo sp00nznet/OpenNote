@@ -23,6 +23,9 @@ int Dialogs_SaveChanges(HWND hParent, const WCHAR* filename);  // Returns IDYES,
 // Input dialog
 BOOL Dialogs_InputBox(HWND hParent, const WCHAR* title, const WCHAR* prompt, WCHAR* buffer, int bufferSize);
 
+// Print preview
+void Dialogs_PrintPreview(HWND hParent, HWND hEditor);
+
 // Dialog procedures
 INT_PTR CALLBACK GoToLineProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK AboutProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);

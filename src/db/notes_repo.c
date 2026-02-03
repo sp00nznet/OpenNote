@@ -308,7 +308,7 @@ int Notes_GetList(NoteListItem** items, int* count) {
     if (!*items) return -1;
 
     // Fetch notes
-    const char* sql = "SELECT id, title, updated_at, is_pinned FROM notes "
+    const char* sql = "SELECT id, title, updated_at, is_pinned, LENGTH(content) FROM notes "
                       "WHERE is_archived = 0 ORDER BY is_pinned DESC, updated_at DESC";
 
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
@@ -328,6 +328,7 @@ int Notes_GetList(NoteListItem** items, int* count) {
         MultiByteToWideChar(CP_UTF8, 0, updatedAt ? updatedAt : "", -1, (*items)[i].updatedAt, 32);
 
         (*items)[i].isPinned = sqlite3_column_int(stmt, 3);
+        (*items)[i].contentSize = sqlite3_column_int(stmt, 4);
         i++;
     }
 
@@ -354,7 +355,7 @@ int Notes_Search(const WCHAR* query, NoteListItem** items, int* count) {
     // Build FTS5 query
     char sql[1024];
     snprintf(sql, sizeof(sql),
-             "SELECT n.id, n.title, n.updated_at, n.is_pinned FROM notes n "
+             "SELECT n.id, n.title, n.updated_at, n.is_pinned, LENGTH(n.content) FROM notes n "
              "INNER JOIN notes_fts f ON n.id = f.rowid "
              "WHERE notes_fts MATCH '%s*' AND n.is_archived = 0 "
              "ORDER BY n.is_pinned DESC, rank",
@@ -364,7 +365,7 @@ int Notes_Search(const WCHAR* query, NoteListItem** items, int* count) {
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
         // Fall back to LIKE search if FTS fails
         snprintf(sql, sizeof(sql),
-                 "SELECT id, title, updated_at, is_pinned FROM notes "
+                 "SELECT id, title, updated_at, is_pinned, LENGTH(content) FROM notes "
                  "WHERE (title LIKE '%%%s%%' OR content LIKE '%%%s%%') AND is_archived = 0 "
                  "ORDER BY is_pinned DESC, updated_at DESC",
                  queryUtf8, queryUtf8);
@@ -393,6 +394,7 @@ int Notes_Search(const WCHAR* query, NoteListItem** items, int* count) {
         MultiByteToWideChar(CP_UTF8, 0, updatedAt ? updatedAt : "", -1, (*items)[i].updatedAt, 32);
 
         (*items)[i].isPinned = sqlite3_column_int(stmt, 3);
+        (*items)[i].contentSize = sqlite3_column_int(stmt, 4);
         i++;
     }
 

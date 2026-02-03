@@ -145,6 +145,9 @@ BOOL Database_Initialize(void) {
         return FALSE;
     }
 
+    // Migration: Add target_url column to links table if it doesn't exist
+    sqlite3_exec(g_db, "ALTER TABLE links ADD COLUMN target_url TEXT;", NULL, NULL, NULL);
+
     return TRUE;
 }
 

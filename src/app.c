@@ -178,6 +178,8 @@ void App_LoadSettings(void) {
                 g_app->alwaysOnTop = atoi(value);
             } else if (strcmp(key, "auto_save_on_exit") == 0) {
                 g_app->autoSaveOnExit = atoi(value);
+            } else if (strcmp(key, "minimize_to_tray") == 0) {
+                g_app->minimizeToTray = atoi(value);
             } else if (strcmp(key, "tab_size") == 0) {
                 g_app->tabSize = atoi(value);
             } else if (strcmp(key, "zoom_level") == 0) {
@@ -228,6 +230,9 @@ void App_SaveSettings(void) {
     Database_Execute(sql);
 
     snprintf(sql, sizeof(sql), "INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_save_on_exit', '%d')", g_app->autoSaveOnExit);
+    Database_Execute(sql);
+
+    snprintf(sql, sizeof(sql), "INSERT OR REPLACE INTO settings (key, value) VALUES ('minimize_to_tray', '%d')", g_app->minimizeToTray);
     Database_Execute(sql);
 
     snprintf(sql, sizeof(sql), "INSERT OR REPLACE INTO settings (key, value) VALUES ('tab_size', '%d')", g_app->tabSize);
@@ -318,6 +323,9 @@ int App_CreateTab(const WCHAR* title) {
     // Set as active
     App_SetActiveTab(index);
 
+    // Update new tab button position
+    MainWindow_UpdateNewTabButton();
+
     return index;
 }
 
@@ -368,6 +376,9 @@ void App_CloseTab(int index) {
         int newIndex = (index >= g_app->tabCount) ? g_app->tabCount - 1 : index;
         App_SetActiveTab(newIndex);
     }
+
+    // Update new tab button position
+    MainWindow_UpdateNewTabButton();
 }
 
 // Set active tab
