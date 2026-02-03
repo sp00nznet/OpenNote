@@ -54,19 +54,17 @@ package:
         choco install innosetup -y --no-progress
       }
     # Create output directory
-    - mkdir -p build/installer
+    - New-Item -ItemType Directory -Force -Path build\installer
     # Build the installer
     - '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\OpenNoteSetup.iss'
     # Create dist folder with both exe and installer
-    - mkdir -p dist
-    - cp build/bin/OpenNote.exe dist/
-    - cp build/installer/OpenNoteSetup.exe dist/
-    - echo "OpenNote $(git describe --tags --always)" > dist/VERSION.txt
+    - New-Item -ItemType Directory -Force -Path dist
+    - Copy-Item -Path build\bin\OpenNote.exe -Destination dist\ -Force
+    - Copy-Item -Path build\installer\OpenNoteSetup.exe -Destination dist\ -Force
   artifacts:
     name: "OpenNote-${CI_COMMIT_SHORT_SHA}"
     paths:
       - dist/
-      - build/installer/OpenNoteSetup.exe
     expire_in: 30 days
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -80,10 +78,8 @@ deploy:
       artifacts: true
   script:
     - 'net use R: \\192.168.100.22\releases gitlab /user:root'
-    - '$destPath = "R:\$env:CI_PROJECT_NAME"'
-    - 'if (-not (Test-Path $destPath)) { New-Item -ItemType Directory -Path $destPath -Force }'
-    - 'Copy-Item -Path "dist\OpenNote.exe" -Destination $destPath -Force'
-    - 'Copy-Item -Path "dist\OpenNoteSetup.exe" -Destination $destPath -Force'
+    - 'New-Item -ItemType Directory -Force -Path "R:\$env:CI_PROJECT_NAME"'
+    - 'Copy-Item -Path "dist\*" -Destination "R:\$env:CI_PROJECT_NAME" -Force'
     - 'net use R: /delete'
   rules:
     - if: $CI_COMMIT_TAG
