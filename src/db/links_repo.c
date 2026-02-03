@@ -50,6 +50,55 @@ int Links_Create(int sourceType, const WCHAR* sourcePath, int sourceNoteId,
     return result;
 }
 
+// Create a new link to URL
+int Links_CreateURL(int sourceType, const WCHAR* sourcePath, int sourceNoteId,
+                    const WCHAR* linkText, int startPos, int endPos,
+                    const WCHAR* targetURL) {
+    sqlite3* db = Database_GetHandle();
+    if (!db) return -1;
+
+    sqlite3_stmt* stmt;
+    const char* sql = "INSERT INTO links (source_type, source_path, source_note_id, "
+                      "link_text, start_pos, end_pos, target_type, target_url) "
+                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        return -1;
+    }
+
+    // Convert strings to UTF-8
+    char sourcePathUtf8[MAX_PATH * 3] = {0};
+    char targetURLUtf8[1024 * 3] = {0};
+    char linkTextUtf8[MAX_TITLE_LEN * 3] = {0};
+
+    if (sourcePath && sourcePath[0]) {
+        WideCharToMultiByte(CP_UTF8, 0, sourcePath, -1, sourcePathUtf8, sizeof(sourcePathUtf8), NULL, NULL);
+    }
+    if (targetURL && targetURL[0]) {
+        WideCharToMultiByte(CP_UTF8, 0, targetURL, -1, targetURLUtf8, sizeof(targetURLUtf8), NULL, NULL);
+    }
+    if (linkText && linkText[0]) {
+        WideCharToMultiByte(CP_UTF8, 0, linkText, -1, linkTextUtf8, sizeof(linkTextUtf8), NULL, NULL);
+    }
+
+    sqlite3_bind_int(stmt, 1, sourceType);
+    sqlite3_bind_text(stmt, 2, sourcePathUtf8[0] ? sourcePathUtf8 : NULL, -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 3, sourceNoteId);
+    sqlite3_bind_text(stmt, 4, linkTextUtf8, -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 5, startPos);
+    sqlite3_bind_int(stmt, 6, endPos);
+    sqlite3_bind_int(stmt, 7, LINK_TARGET_URL);
+    sqlite3_bind_text(stmt, 8, targetURLUtf8, -1, SQLITE_STATIC);
+
+    int result = -1;
+    if (sqlite3_step(stmt) == SQLITE_DONE) {
+        result = (int)sqlite3_last_insert_rowid(db);
+    }
+
+    sqlite3_finalize(stmt);
+    return result;
+}
+
 // Delete a link
 BOOL Links_Delete(int linkId) {
     sqlite3* db = Database_GetHandle();
@@ -122,16 +171,16 @@ LinkArray* Links_GetForSource(int sourceType, const WCHAR* sourcePath, int sourc
     if (sourceType == DOC_TYPE_FILE) {
         if (hasPath) {
             sql = "SELECT id, source_type, source_path, source_note_id, link_text, "
-                  "start_pos, end_pos, target_type, target_path, target_note_id "
+                  "start_pos, end_pos, target_type, target_path, target_note_id, target_url "
                   "FROM links WHERE source_type = 0 AND source_path = ?";
         } else {
             sql = "SELECT id, source_type, source_path, source_note_id, link_text, "
-                  "start_pos, end_pos, target_type, target_path, target_note_id "
+                  "start_pos, end_pos, target_type, target_path, target_note_id, target_url "
                   "FROM links WHERE source_type = 0 AND source_path IS NULL";
         }
     } else {
         sql = "SELECT id, source_type, source_path, source_note_id, link_text, "
-              "start_pos, end_pos, target_type, target_path, target_note_id "
+              "start_pos, end_pos, target_type, target_path, target_note_id, target_url "
               "FROM links WHERE source_type = 1 AND source_note_id = ?";
     }
 
@@ -188,6 +237,11 @@ LinkArray* Links_GetForSource(int sourceType, const WCHAR* sourcePath, int sourc
 
         link->targetNoteId = sqlite3_column_int(stmt, 9);
 
+        const char* targetUrl = (const char*)sqlite3_column_text(stmt, 10);
+        if (targetUrl) {
+            MultiByteToWideChar(CP_UTF8, 0, targetUrl, -1, link->targetURL, 1024);
+        }
+
         array->count++;
     }
 
@@ -207,19 +261,19 @@ Link* Links_GetAtPosition(int sourceType, const WCHAR* sourcePath, int sourceNot
     if (sourceType == DOC_TYPE_FILE) {
         if (hasPath) {
             sql = "SELECT id, source_type, source_path, source_note_id, link_text, "
-                  "start_pos, end_pos, target_type, target_path, target_note_id "
+                  "start_pos, end_pos, target_type, target_path, target_note_id, target_url "
                   "FROM links WHERE source_type = 0 AND source_path = ? "
                   "AND start_pos <= ? AND end_pos > ?";
         } else {
             // Handle unsaved documents with NULL path
             sql = "SELECT id, source_type, source_path, source_note_id, link_text, "
-                  "start_pos, end_pos, target_type, target_path, target_note_id "
+                  "start_pos, end_pos, target_type, target_path, target_note_id, target_url "
                   "FROM links WHERE source_type = 0 AND source_path IS NULL "
                   "AND start_pos <= ? AND end_pos > ?";
         }
     } else {
         sql = "SELECT id, source_type, source_path, source_note_id, link_text, "
-              "start_pos, end_pos, target_type, target_path, target_note_id "
+              "start_pos, end_pos, target_type, target_path, target_note_id, target_url "
               "FROM links WHERE source_type = 1 AND source_note_id = ? "
               "AND start_pos <= ? AND end_pos > ?";
     }
@@ -276,6 +330,11 @@ Link* Links_GetAtPosition(int sourceType, const WCHAR* sourcePath, int sourceNot
             }
 
             link->targetNoteId = sqlite3_column_int(stmt, 9);
+
+            const char* targetUrl = (const char*)sqlite3_column_text(stmt, 10);
+            if (targetUrl) {
+                MultiByteToWideChar(CP_UTF8, 0, targetUrl, -1, link->targetURL, 1024);
+            }
         }
     }
 

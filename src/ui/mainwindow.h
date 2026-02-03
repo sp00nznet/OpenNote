@@ -17,6 +17,7 @@ BOOL MainWindow_OnQueryEndSession(HWND hwnd);
 // UI updates
 void MainWindow_UpdateTitle(void);
 void MainWindow_UpdateMenuState(void);
+void MainWindow_UpdateNewTabButton(void);
 
 // Context menus
 void MainWindow_ShowEditorContextMenu(HWND hwnd, int x, int y);

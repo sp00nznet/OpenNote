@@ -24,6 +24,7 @@ HMENU MenuBar_Create(void) {
     AppendMenuW(hFileMenu, MF_STRING, IDM_FILE_CLOSE_TAB, L"&Close Tab\tCtrl+W");
     AppendMenuW(hFileMenu, MF_SEPARATOR, 0, NULL);
     AppendMenuW(hFileMenu, MF_STRING, IDM_FILE_PRINT, L"&Print...\tCtrl+P");
+    AppendMenuW(hFileMenu, MF_STRING, IDM_FILE_PRINT_PREVIEW, L"Print Pre&view...");
     AppendMenuW(hFileMenu, MF_SEPARATOR, 0, NULL);
     AppendMenuW(hFileMenu, MF_STRING, IDM_FILE_EXIT, L"E&xit");
     AppendMenuW(hMenu, MF_POPUP, (UINT_PTR)hFileMenu, L"&File");

@@ -21,3 +21,8 @@ Thumbs.db
 # Images that appear to be temporary
 New Bitmap image.bmp
 Untitled.png
+
+# Node modules (used for icon conversion)
+node_modules/
+package-lock.json
+package.json

@@ -23,6 +23,7 @@ struct AppState {
     BOOL showStatusBar;
     BOOL alwaysOnTop;
     BOOL autoSaveOnExit;    // Save session on exit
+    BOOL minimizeToTray;    // Minimize to system tray
     int tabSize;
     int zoomLevel;      // 100 = 100%
     int themeIndex;     // Editor color theme

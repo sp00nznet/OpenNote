@@ -19,6 +19,7 @@ typedef struct {
     WCHAR title[MAX_TITLE_LEN];
     WCHAR updatedAt[32];
     BOOL isPinned;
+    int contentSize;  // Size in bytes
 } NoteListItem;
 
 // CRUD operations
