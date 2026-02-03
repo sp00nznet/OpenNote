@@ -258,26 +258,50 @@ static BOOL ExchangeCodeForToken_Google(const char* code, OAuthToken* tokenOut) 
                 totalRead += bytesRead;
             }
 
-            // Parse JSON response
-            char* accessToken = strstr(response, "\"access_token\":\"");
-            if (accessToken) {
-                accessToken += 16;
-                char* tokenEnd = strchr(accessToken, '"');
-                if (tokenEnd && (tokenEnd - accessToken) < sizeof(tokenOut->accessToken)) {
-                    strncpy_s(tokenOut->accessToken, sizeof(tokenOut->accessToken),
-                              accessToken, tokenEnd - accessToken);
-                    tokenOut->isAuthenticated = TRUE;
-                    strcpy_s(tokenOut->tokenType, sizeof(tokenOut->tokenType), "Bearer");
-                    result = TRUE;
+            // Always show response for debugging
+            WCHAR debugMsg[2048];
+            MultiByteToWideChar(CP_UTF8, 0, response, -1, debugMsg, 2048);
+            MessageBoxW(NULL, debugMsg, L"Google Token Response", MB_ICONINFORMATION);
 
-                    // Also get refresh token if present
-                    char* refreshToken = strstr(response, "\"refresh_token\":\"");
-                    if (refreshToken) {
-                        refreshToken += 17;
-                        char* refreshEnd = strchr(refreshToken, '"');
-                        if (refreshEnd && (refreshEnd - refreshToken) < sizeof(tokenOut->refreshToken)) {
-                            strncpy_s(tokenOut->refreshToken, sizeof(tokenOut->refreshToken),
-                                      refreshToken, refreshEnd - refreshToken);
+            // Check for error response
+            char* error = strstr(response, "\"error\":");
+            if (error) {
+                // Error already shown above
+            }
+
+            // Parse JSON response
+            char* accessToken = strstr(response, "\"access_token\"");
+            if (accessToken) {
+                // Find the value after the colon and opening quote
+                accessToken = strchr(accessToken, ':');
+                if (accessToken) {
+                    accessToken = strchr(accessToken, '"');
+                    if (accessToken) {
+                        accessToken++; // Skip the quote
+                        char* tokenEnd = strchr(accessToken, '"');
+                        if (tokenEnd && (tokenEnd - accessToken) < sizeof(tokenOut->accessToken)) {
+                            strncpy_s(tokenOut->accessToken, sizeof(tokenOut->accessToken),
+                                      accessToken, tokenEnd - accessToken);
+                            tokenOut->isAuthenticated = TRUE;
+                            strcpy_s(tokenOut->tokenType, sizeof(tokenOut->tokenType), "Bearer");
+                            result = TRUE;
+
+                            // Also get refresh token if present
+                            char* refreshToken = strstr(response, "\"refresh_token\"");
+                            if (refreshToken) {
+                                refreshToken = strchr(refreshToken, ':');
+                                if (refreshToken) {
+                                    refreshToken = strchr(refreshToken, '"');
+                                    if (refreshToken) {
+                                        refreshToken++;
+                                        char* refreshEnd = strchr(refreshToken, '"');
+                                        if (refreshEnd && (refreshEnd - refreshToken) < sizeof(tokenOut->refreshToken)) {
+                                            strncpy_s(tokenOut->refreshToken, sizeof(tokenOut->refreshToken),
+                                                      refreshToken, refreshEnd - refreshToken);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
