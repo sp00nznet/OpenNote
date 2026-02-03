@@ -826,14 +826,6 @@ void MainWindow_OnCommand(HWND hwnd, int id, HWND hwndCtl, UINT codeNotify) {
             break;
 
         // Settings menu
-        case IDM_SETTINGS_AUTOSAVE:
-            g_app->autoSaveSession = !g_app->autoSaveSession;
-            break;
-
-        case IDM_SETTINGS_RESTORE:
-            App_RestoreSession();
-            break;
-
         case IDM_SETTINGS_DEFAULTS:
             Dialogs_Defaults(hwnd);
             break;

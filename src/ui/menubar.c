@@ -82,11 +82,7 @@ HMENU MenuBar_Create(void) {
 
     // Settings menu
     HMENU hSettingsMenu = CreatePopupMenu();
-    AppendMenuW(hSettingsMenu, MF_STRING, IDM_SETTINGS_AUTOSAVE, L"&Auto-save Session on Exit");
-    AppendMenuW(hSettingsMenu, MF_SEPARATOR, 0, NULL);
-    AppendMenuW(hSettingsMenu, MF_STRING, IDM_SETTINGS_RESTORE, L"&Restore Previous Session");
-    AppendMenuW(hSettingsMenu, MF_SEPARATOR, 0, NULL);
-    AppendMenuW(hSettingsMenu, MF_STRING, IDM_SETTINGS_DEFAULTS, L"&Defaults...");
+    AppendMenuW(hSettingsMenu, MF_STRING, IDM_SETTINGS_DEFAULTS, L"&Default Settings...");
     AppendMenuW(hMenu, MF_POPUP, (UINT_PTR)hSettingsMenu, L"&Settings");
 
     // Help menu
@@ -169,7 +165,7 @@ void MenuBar_UpdateViewMenu(HMENU hMenu) {
 
 // Update Settings menu state
 void MenuBar_UpdateSettingsMenu(HMENU hMenu) {
-    CheckMenuItem(hMenu, IDM_SETTINGS_AUTOSAVE, MF_BYCOMMAND | (g_app->autoSaveSession ? MF_CHECKED : MF_UNCHECKED));
+    (void)hMenu;  // Settings are now in the Defaults dialog
 }
 
 // Update recent files menu
