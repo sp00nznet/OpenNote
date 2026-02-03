@@ -5,8 +5,8 @@
 
 // OAuth state
 typedef struct {
-    char accessToken[256];
-    char refreshToken[256];
+    char accessToken[1024];
+    char refreshToken[1024];
     char tokenType[32];
     int expiresIn;
     BOOL isAuthenticated;
