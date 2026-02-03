@@ -62,6 +62,7 @@ typedef struct AppState AppState;
 #include "db/database.h"
 #include "db/notes_repo.h"
 #include "db/links_repo.h"
+#include "sync/oauth.h"
 
 // Global application state
 extern AppState* g_app;

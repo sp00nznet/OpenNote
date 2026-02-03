@@ -1493,6 +1493,18 @@ static INT_PTR CALLBACK SyncAccountsProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
     switch (msg) {
         case WM_INITDIALOG:
             {
+                // Check for saved tokens if not already signed in
+                if (!g_app->syncProvider || g_app->syncProvider[0] == L'\0') {
+                    OAuthToken token;
+                    if (OAuth_LoadToken("github", &token) && token.isAuthenticated) {
+                        if (g_app->syncProvider) free(g_app->syncProvider);
+                        g_app->syncProvider = _wcsdup(L"GitHub");
+                    } else if (OAuth_LoadToken("google", &token) && token.isAuthenticated) {
+                        if (g_app->syncProvider) free(g_app->syncProvider);
+                        g_app->syncProvider = _wcsdup(L"Google Drive");
+                    }
+                }
+
                 // Update status and button states based on current sync state
                 if (g_app->syncProvider && g_app->syncProvider[0] != L'\0') {
                     WCHAR status[256];
@@ -1512,37 +1524,45 @@ static INT_PTR CALLBACK SyncAccountsProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             switch (LOWORD(wParam)) {
                 case IDC_SYNC_GITHUB:
                     {
-                        // Check if GitHub API keys are configured
-                        #ifdef GITHUB_CLIENT_ID
-                        // TODO: Implement OAuth flow
-                        // For now, show placeholder
-                        MessageBoxW(hwnd, L"GitHub sign-in will open in your browser.\n\nThis feature is coming soon!",
-                                    APP_NAME, MB_ICONINFORMATION);
-                        #else
-                        MessageBoxW(hwnd, L"GitHub sync is not configured in this build.\n\nAPI keys required.",
-                                    APP_NAME, MB_ICONWARNING);
-                        #endif
+                        OAuthToken token;
+                        if (OAuth_GitHubLogin(hwnd, &token)) {
+                            // Success - update UI
+                            if (g_app->syncProvider) free(g_app->syncProvider);
+                            g_app->syncProvider = _wcsdup(L"GitHub");
+                            SetDlgItemTextW(hwnd, IDC_SYNC_STATUS, L"Signed in with GitHub");
+                            EnableWindow(GetDlgItem(hwnd, IDC_SYNC_SIGNOUT), TRUE);
+                            EnableWindow(GetDlgItem(hwnd, IDC_SYNC_GITHUB), FALSE);
+                            EnableWindow(GetDlgItem(hwnd, IDC_SYNC_GOOGLE), FALSE);
+                            MessageBoxW(hwnd, L"Successfully signed in with GitHub!", APP_NAME, MB_ICONINFORMATION);
+                        }
                     }
                     return TRUE;
 
                 case IDC_SYNC_GOOGLE:
                     {
-                        // Check if Google API keys are configured
-                        #ifdef GOOGLE_CLIENT_ID
-                        // TODO: Implement OAuth flow
-                        MessageBoxW(hwnd, L"Google Drive sign-in will open in your browser.\n\nThis feature is coming soon!",
-                                    APP_NAME, MB_ICONINFORMATION);
-                        #else
-                        MessageBoxW(hwnd, L"Google Drive sync is not configured in this build.\n\nAPI keys required.",
-                                    APP_NAME, MB_ICONWARNING);
-                        #endif
+                        OAuthToken token;
+                        if (OAuth_GoogleLogin(hwnd, &token)) {
+                            // Success - update UI
+                            if (g_app->syncProvider) free(g_app->syncProvider);
+                            g_app->syncProvider = _wcsdup(L"Google Drive");
+                            SetDlgItemTextW(hwnd, IDC_SYNC_STATUS, L"Signed in with Google Drive");
+                            EnableWindow(GetDlgItem(hwnd, IDC_SYNC_SIGNOUT), TRUE);
+                            EnableWindow(GetDlgItem(hwnd, IDC_SYNC_GITHUB), FALSE);
+                            EnableWindow(GetDlgItem(hwnd, IDC_SYNC_GOOGLE), FALSE);
+                            MessageBoxW(hwnd, L"Successfully signed in with Google Drive!", APP_NAME, MB_ICONINFORMATION);
+                        }
                     }
                     return TRUE;
 
                 case IDC_SYNC_SIGNOUT:
                     if (MessageBoxW(hwnd, L"Sign out from cloud sync?", APP_NAME, MB_YESNO | MB_ICONQUESTION) == IDYES) {
-                        // Clear sync provider
+                        // Clear tokens
                         if (g_app->syncProvider) {
+                            if (wcscmp(g_app->syncProvider, L"GitHub") == 0) {
+                                OAuth_GitHubLogout();
+                            } else if (wcscmp(g_app->syncProvider, L"Google Drive") == 0) {
+                                OAuth_GoogleLogout();
+                            }
                             free(g_app->syncProvider);
                             g_app->syncProvider = NULL;
                         }
