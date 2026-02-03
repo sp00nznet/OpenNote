@@ -23,7 +23,7 @@ AllowNoIcons=yes
 ; Output settings
 OutputDir=..\build\installer
 OutputBaseFilename=OpenNoteSetup
-SetupIconFile=..\gfx\icon.ico
+SetupIconFile=..\res\icon.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
