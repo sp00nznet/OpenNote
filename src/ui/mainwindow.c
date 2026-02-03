@@ -275,10 +275,14 @@ void MainWindow_UpdateNewTabButton(void) {
     int tabCount = (int)SendMessageW(g_app->hTabControl, TCM_GETITEMCOUNT, 0, 0);
     if (tabCount > 0) {
         RECT rcTab;
-        SendMessageW(g_app->hTabControl, TCM_GETITEMRECT, tabCount - 1, (LPARAM)&rcTab);
-        btnX = rcTab.right + 2;
+        if (SendMessageW(g_app->hTabControl, TCM_GETITEMRECT, tabCount - 1, (LPARAM)&rcTab)) {
+            btnX = rcTab.right + 2;
+        }
     }
-    SetWindowPos(g_hNewTabBtn, HWND_TOP, btnX, 2, btnWidth, tabHeight - 4, 0);
+
+    // Position button and ensure it's visible on top
+    SetWindowPos(g_hNewTabBtn, HWND_TOP, btnX, 2, btnWidth, tabHeight - 4, SWP_SHOWWINDOW);
+    InvalidateRect(g_hNewTabBtn, NULL, TRUE);
 }
 
 // Create child controls
@@ -286,10 +290,10 @@ static void OnCreate(HWND hwnd) {
     // Create tab control
     g_app->hTabControl = TabControl_Create(hwnd);
 
-    // Create "+" button for new tab
+    // Create "+" button for new tab (initially hidden until properly positioned)
     g_hNewTabBtn = CreateWindowExW(
         0, L"BUTTON", L"+",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+        WS_CHILD | BS_PUSHBUTTON,  // Not visible yet - will show after positioning
         0, 0, 24, 22,
         hwnd, (HMENU)(INT_PTR)IDC_NEW_TAB_BTN,
         g_app->hInstance, NULL
