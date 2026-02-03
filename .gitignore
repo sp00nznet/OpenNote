@@ -1,0 +1,23 @@
+# Build artifacts
+build/
+*.o
+*.obj
+*.exe
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Windows artifacts
+nul
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+
+# Images that appear to be temporary
+New Bitmap image.bmp
+Untitled.png
