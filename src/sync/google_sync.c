@@ -240,11 +240,17 @@ BOOL GoogleSync_UploadNote(int noteId, const WCHAR* title, const WCHAR* content)
         return FALSE;
     }
 
-    // Convert to UTF-8
+    // Convert title to UTF-8
     char titleUtf8[MAX_TITLE_LEN * 3];
-    char contentUtf8[1024 * 1024]; // 1MB max
     WideCharToMultiByte(CP_UTF8, 0, title, -1, titleUtf8, sizeof(titleUtf8), NULL, NULL);
-    WideCharToMultiByte(CP_UTF8, 0, content, -1, contentUtf8, sizeof(contentUtf8), NULL, NULL);
+
+    // Convert content to UTF-8 (heap allocated)
+    int contentUtf8Len = WideCharToMultiByte(CP_UTF8, 0, content, -1, NULL, 0, NULL, NULL);
+    if (contentUtf8Len <= 0) return FALSE;
+
+    char* contentUtf8 = (char*)malloc(contentUtf8Len);
+    if (!contentUtf8) return FALSE;
+    WideCharToMultiByte(CP_UTF8, 0, content, -1, contentUtf8, contentUtf8Len, NULL, NULL);
 
     // Escape title for JSON
     char titleEscaped[MAX_TITLE_LEN * 6];
@@ -264,7 +270,10 @@ BOOL GoogleSync_UploadNote(int noteId, const WCHAR* title, const WCHAR* content)
     const char* boundary = "opennote_boundary_12345";
     size_t bodySize = strlen(contentUtf8) + 2048;
     char* body = (char*)malloc(bodySize);
-    if (!body) return FALSE;
+    if (!body) {
+        free(contentUtf8);
+        return FALSE;
+    }
 
     if (isUpdate) {
         // For updates, just send the metadata
@@ -318,6 +327,7 @@ BOOL GoogleSync_UploadNote(int noteId, const WCHAR* title, const WCHAR* content)
         }
     }
 
+    free(contentUtf8);
     free(body);
     return success;
 }
