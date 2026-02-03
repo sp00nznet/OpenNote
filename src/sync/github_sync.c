@@ -24,7 +24,7 @@ static BOOL GetGitHubToken(char* tokenOut, int tokenSize) {
 // Make GitHub API request
 static BOOL GitHubAPI_Request(const WCHAR* method, const WCHAR* path, const char* body,
                                char* responseOut, int responseSize, int* httpStatusOut) {
-    char token[256];
+    char token[1024];
     if (!GetGitHubToken(token, sizeof(token))) {
         return FALSE;
     }
@@ -49,8 +49,8 @@ static BOOL GitHubAPI_Request(const WCHAR* method, const WCHAR* path, const char
     }
 
     // Build auth header
-    WCHAR authHeader[512];
-    WCHAR tokenW[256];
+    WCHAR authHeader[1280];
+    WCHAR tokenW[1024];
     MultiByteToWideChar(CP_UTF8, 0, token, -1, tokenW, 256);
     swprintf_s(authHeader, 512, L"Authorization: Bearer %s", tokenW);
     WinHttpAddRequestHeaders(hRequest, authHeader, -1, WINHTTP_ADDREQ_FLAG_ADD);
