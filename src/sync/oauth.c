@@ -258,15 +258,12 @@ static BOOL ExchangeCodeForToken_Google(const char* code, OAuthToken* tokenOut) 
                 totalRead += bytesRead;
             }
 
-            // Always show response for debugging
-            WCHAR debugMsg[2048];
-            MultiByteToWideChar(CP_UTF8, 0, response, -1, debugMsg, 2048);
-            MessageBoxW(NULL, debugMsg, L"Google Token Response", MB_ICONINFORMATION);
-
             // Check for error response
             char* error = strstr(response, "\"error\":");
             if (error) {
-                // Error already shown above
+                WCHAR errorMsg[2048];
+                MultiByteToWideChar(CP_UTF8, 0, response, -1, errorMsg, 2048);
+                MessageBoxW(NULL, errorMsg, L"Google OAuth Error", MB_ICONERROR);
             }
 
             // Parse JSON response
