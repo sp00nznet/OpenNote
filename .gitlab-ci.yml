@@ -1,0 +1,56 @@
+stages:
+  - build
+  - package
+
+variables:
+  CMAKE_BUILD_TYPE: Release
+
+build:
+  stage: build
+  tags:
+    - windows
+    - vs2022
+  script:
+    - cmake -B build -G "Visual Studio 17 2022" -A x64
+    - cmake --build build --config Release
+  artifacts:
+    paths:
+      - build/bin/Release/OpenNote.exe
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_MERGE_REQUEST_ID
+
+build:debug:
+  stage: build
+  tags:
+    - windows
+    - vs2022
+  script:
+    - cmake -B build -G "Visual Studio 17 2022" -A x64
+    - cmake --build build --config Debug
+  artifacts:
+    paths:
+      - build/bin/Debug/OpenNote.exe
+    expire_in: 3 days
+  rules:
+    - if: $CI_COMMIT_BRANCH != "main"
+  allow_failure: true
+
+package:
+  stage: package
+  tags:
+    - windows
+  needs:
+    - build
+  script:
+    - mkdir -p dist
+    - cp build/bin/Release/OpenNote.exe dist/
+    - echo "OpenNote $(git describe --tags --always)" > dist/VERSION.txt
+  artifacts:
+    name: "OpenNote-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - dist/
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

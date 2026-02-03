@@ -1,165 +1,130 @@
 # OpenNote
 
-A modern, lightweight tabbed text editor for Windows with SQLite-based note storage. Built as a Notepad replacement with enhanced features for power users.
-
-## Features
-
-### Core Editing
-- **Tabbed Interface** - Work with multiple documents simultaneously
-- **Rich Text Editing** - Powered by Windows RichEdit control
-- **Find & Replace** - Full-featured search with match case, whole word, and wrap-around options
-- **Go To Line** - Quick navigation (Ctrl+G)
-- **Word Wrap** - Toggle word wrap per preference
-- **Zoom** - Adjustable zoom level (Ctrl+Plus/Minus, Ctrl+0 to reset)
-- **Undo/Redo** - Multi-level undo history
-
-### File Operations
-- **Multiple Encodings** - Support for UTF-8, UTF-16 LE/BE, and ANSI
-- **Recent Files** - Quick access to recently opened files
-- **Print Support** - Basic printing with proper text wrapping
-- **Drag & Drop** - Open files by dropping onto the window (planned)
-
-### Notes Database
-- **SQLite Storage** - All notes stored in a local SQLite database
-- **Full-Text Search** - Fast search across all notes using FTS5
-- **Notes Browser** - Visual interface to browse and manage notes
-- **Import/Export** - Save files to notes, export notes to files
-- **Pin & Archive** - Organize your notes (planned)
-
-### Session Management
-- **Auto-Save on Exit** - Optionally save your entire session (open tabs, content) when closing
-- **Restore Session** - Restore previous session with all tabs and unsaved content
-- **Settings Persistence** - All preferences saved to database
-
-### Comparison
-- **Side-by-Side Compare** - Right-click any tab to compare with another open document
-- **Visual Diff** - View two documents simultaneously in a split view
-
-### Keyboard Shortcuts
-| Shortcut | Action |
-|----------|--------|
-| Ctrl+N | New file |
-| Ctrl+O | Open file |
-| Ctrl+S | Save |
-| Ctrl+Shift+S | Save As |
-| Ctrl+W | Close tab |
-| Ctrl+Tab | Next tab |
-| Ctrl+Shift+Tab | Previous tab |
-| Ctrl+F | Find |
-| Ctrl+H | Replace |
-| F3 | Find Next |
-| Shift+F3 | Find Previous |
-| Ctrl+G | Go To Line |
-| Ctrl+A | Select All |
-| F5 | Insert Date/Time |
-| Ctrl+Z | Undo |
-| Ctrl+Y | Redo |
-| Ctrl+Plus | Zoom In |
-| Ctrl+Minus | Zoom Out |
-| Ctrl+0 | Reset Zoom |
-
-### Context Menus
-- **Tab Context Menu** - Save, Save As, Import to Notes, Compare, Close options
-- **Empty Tab Area** - Right-click for New, Open, New Note, Open Note
-
-## Building
-
-### Requirements
-- Windows 10/11
-- Visual Studio 2022 (or compatible MSVC toolchain)
-- CMake 3.16+
-
-### Build Steps
-```bash
-git clone https://github.com/sp00nznet/OpenNote.git
-cd OpenNote
-cmake -B build
-cmake --build build --config Release
+```
+   ____                   _   _       _
+  / __ \                 | \ | |     | |
+ | |  | |_ __   ___ _ __ |  \| | ___ | |_ ___
+ | |  | | '_ \ / _ \ '_ \| . ` |/ _ \| __/ _ \
+ | |__| | |_) |  __/ | | | |\  | (_) | ||  __/
+  \____/| .__/ \___|_| |_|_| \_|\___/ \__\___|
+        | |
+        |_|
 ```
 
-The executable will be at `build/bin/OpenNote.exe`.
+[![Build Status](https://buildforever.cloud/sp00nz/OpenNote/badges/main/pipeline.svg)](https://buildforever.cloud/sp00nz/OpenNote/-/pipelines)
+[![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)](https://github.com/sp00nznet/OpenNote)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![C](https://img.shields.io/badge/language-C-orange.svg)](https://en.wikipedia.org/wiki/C_(programming_language))
 
-### Dependencies
-- **SQLite** - Included as amalgamation (lib/sqlite/)
-- **Windows SDK** - Common controls, common dialogs, RichEdit
+> A modern, lightweight tabbed text editor for Windows with SQLite-based note storage. Built as a Notepad replacement with enhanced features for power users.
 
-## Configuration
+---
 
-Settings are stored in:
-- Windows: `%APPDATA%\OpenNote\opennote.db`
+## ✨ Features
 
-### Settings Menu
-- **Auto-save Session on Exit** - When enabled, saves all open tabs and their content
-- **Restore Previous Session** - Manually restore the last saved session
+| Feature | Description |
+|---------|-------------|
+| **Tabbed Interface** | Work with multiple documents simultaneously |
+| **SQLite Notes** | Store notes in a local database with full-text search |
+| **Session Restore** | Auto-save and restore your workspace |
+| **Side-by-Side Compare** | Visual diff between any two open documents |
+| **Print Preview** | Preview documents before printing |
+| **System Tray** | Minimize to tray for quick access |
+| **Shell Integration** | Run selected text in CMD or PowerShell |
+| **Cross-Tab Search** | Find and replace across all open tabs |
 
-## Project Structure
+### Core Editing
+- Rich text editing powered by Scintilla
+- Find & Replace with regex support
+- Word wrap, zoom, and customizable fonts
+- Multi-level undo/redo history
+
+### Notes Database
+- SQLite storage with FTS5 full-text search
+- Notes browser with search and file size display
+- Import files to notes, export notes to files
+- Rename and organize your notes
+
+### Keyboard Shortcuts
+
+| Shortcut | Action | Shortcut | Action |
+|----------|--------|----------|--------|
+| `Ctrl+N` | New file | `Ctrl+F` | Find |
+| `Ctrl+O` | Open file | `Ctrl+H` | Replace |
+| `Ctrl+S` | Save | `Ctrl+G` | Go To Line |
+| `Ctrl+W` | Close tab | `F3` | Find Next |
+| `Ctrl+Tab` | Next tab | `Ctrl++` | Zoom In |
+| `Ctrl+Shift+Tab` | Previous tab | `Ctrl+-` | Zoom Out |
+
+---
+
+## 🚀 Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/sp00nznet/OpenNote.git
+cd OpenNote
+
+# Build with CMake
+cmake -B build
+cmake --build build --config Release
+
+# Run
+./build/bin/OpenNote.exe
+```
+
+**Requirements:** Windows 10/11, Visual Studio 2022, CMake 3.16+
+
+See [BUILDING.md](BUILDING.md) for detailed build instructions.
+
+---
+
+## 📁 Project Structure
 
 ```
 OpenNote/
-├── CMakeLists.txt          # Build configuration
-├── include/
-│   └── supernote.h         # Main header
-├── src/
-│   ├── main.c              # Entry point
-│   ├── app.c/h             # Application state
-│   ├── ui/
-│   │   ├── mainwindow.c/h  # Main window
-│   │   ├── tabcontrol.c/h  # Tab management
-│   │   ├── editor.c/h      # Editor wrapper
-│   │   ├── menubar.c/h     # Menus
-│   │   ├── statusbar.c/h   # Status bar
-│   │   └── dialogs.c/h     # Dialogs
-│   ├── core/
-│   │   ├── document.c/h    # Document model
-│   │   ├── fileio.c/h      # File I/O
-│   │   └── search.c/h      # Search engine
-│   └── db/
-│       ├── database.c/h    # SQLite wrapper
-│       └── notes_repo.c/h  # Notes CRUD
-├── res/
-│   ├── resource.h          # Resource IDs
-│   ├── supernote.rc        # Resources
-│   └── manifest.xml        # DPI/visual styles
-└── lib/sqlite/
-    ├── sqlite3.c           # SQLite amalgamation
-    └── sqlite3.h
+├── src/           # Source code
+│   ├── ui/        # Window, tabs, dialogs
+│   ├── core/      # Document, file I/O, search
+│   └── db/        # SQLite, notes repository
+├── res/           # Resources (icons, dialogs)
+├── lib/           # Third-party (SQLite)
+└── include/       # Headers
 ```
 
-## Database Schema
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed documentation.
 
-```sql
--- Notes storage with full-text search
-CREATE TABLE notes (
-    id INTEGER PRIMARY KEY,
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    created_at TEXT,
-    updated_at TEXT,
-    is_pinned INTEGER,
-    is_archived INTEGER
-);
+---
 
-CREATE VIRTUAL TABLE notes_fts USING fts5(title, content);
+## 🔧 Configuration
 
--- Session persistence
-CREATE TABLE session_tabs (
-    tab_index INTEGER PRIMARY KEY,
-    doc_type INTEGER,
-    file_path TEXT,
-    note_id INTEGER,
-    title TEXT,
-    content TEXT,
-    is_modified INTEGER
-);
+Settings are stored in `%APPDATA%\OpenNote\opennote.db`
 
--- Application settings
-CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);
-```
+- **Auto-save Session** - Save all tabs on exit
+- **Minimize to Tray** - Keep running in system tray
+- **Default Font Size** - Set preferred editor font size
+- **Theme** - Light or dark mode
 
-## License
+---
 
-MIT License - see LICENSE file for details.
+## 🤝 Contributing
 
-## Contributing
+Contributions welcome! Please open an issue or pull request.
 
-Contributions welcome! Please open an issue or pull request on GitHub.
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+---
+
+<p align="center">
+  Made with ❤️ for Windows power users
+</p>
