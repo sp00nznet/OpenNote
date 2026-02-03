@@ -447,7 +447,7 @@ void MainWindow_OnSize(HWND hwnd, UINT state, int cx, int cy) {
 // Handle WM_CLOSE
 void MainWindow_OnClose(HWND hwnd) {
     // If auto-save on exit is enabled, skip prompts - session will be saved
-    if (!g_app->autoSaveOnExit) {
+    if (!g_app->autoSaveSession) {
         // Check for unsaved changes in all tabs
         for (int i = 0; i < MAX_TABS; i++) {
             if (g_app->tabs[i] && g_app->tabs[i]->document && g_app->tabs[i]->document->modified) {
@@ -827,7 +827,7 @@ void MainWindow_OnCommand(HWND hwnd, int id, HWND hwndCtl, UINT codeNotify) {
 
         // Settings menu
         case IDM_SETTINGS_AUTOSAVE:
-            g_app->autoSaveOnExit = !g_app->autoSaveOnExit;
+            g_app->autoSaveSession = !g_app->autoSaveSession;
             break;
 
         case IDM_SETTINGS_RESTORE:

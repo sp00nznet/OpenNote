@@ -4,17 +4,22 @@ stages:
 
 variables:
   CMAKE_BUILD_TYPE: Release
+  # Cloud sync API keys (optional - app builds without them)
+  # GITHUB_CLIENT_ID: ""
+  # GITHUB_CLIENT_SECRET: ""
+  # GOOGLE_CLIENT_ID: ""
+  # GOOGLE_CLIENT_SECRET: ""
 
 build:
   stage: build
   tags:
     - windows
   script:
-    - cmake -B build -G "Visual Studio 17 2022" -A x64
+    - cmake -B build -G "Visual Studio 17 2022" -A x64 -DGITHUB_CLIENT_ID="$GITHUB_CLIENT_ID" -DGITHUB_CLIENT_SECRET="$GITHUB_CLIENT_SECRET" -DGOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" -DGOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET"
     - cmake --build build --config Release
   artifacts:
     paths:
-      - build/bin/Release/OpenNote.exe
+      - build/bin/OpenNote.exe
     expire_in: 1 week
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -29,7 +34,7 @@ build:debug:
     - cmake --build build --config Debug
   artifacts:
     paths:
-      - build/bin/Debug/OpenNote.exe
+      - build/bin/OpenNote.exe
     expire_in: 3 days
   rules:
     - if: $CI_COMMIT_BRANCH != "main"
@@ -43,7 +48,7 @@ package:
     - build
   script:
     - mkdir -p dist
-    - cp build/bin/Release/OpenNote.exe dist/
+    - cp build/bin/OpenNote.exe dist/
     - echo "OpenNote $(git describe --tags --always)" > dist/VERSION.txt
   artifacts:
     name: "OpenNote-${CI_COMMIT_SHORT_SHA}"

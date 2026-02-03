@@ -169,7 +169,7 @@ void MenuBar_UpdateViewMenu(HMENU hMenu) {
 
 // Update Settings menu state
 void MenuBar_UpdateSettingsMenu(HMENU hMenu) {
-    CheckMenuItem(hMenu, IDM_SETTINGS_AUTOSAVE, MF_BYCOMMAND | (g_app->autoSaveOnExit ? MF_CHECKED : MF_UNCHECKED));
+    CheckMenuItem(hMenu, IDM_SETTINGS_AUTOSAVE, MF_BYCOMMAND | (g_app->autoSaveSession ? MF_CHECKED : MF_UNCHECKED));
 }
 
 // Update recent files menu

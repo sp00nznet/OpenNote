@@ -105,6 +105,7 @@
 #define IDD_REPLACE_IN_TABS     408
 #define IDD_INPUTBOX            409
 #define IDD_PRINT_PREVIEW       410
+#define IDD_SYNC_ACCOUNTS       411
 
 // Dialog controls
 #define IDC_STATIC              -1
@@ -141,6 +142,14 @@
 #define IDC_PREVIEW_PAGENUM     1131
 #define IDC_NOTES_RENAME        1132
 #define IDC_NEW_TAB_BTN         1133
+#define IDC_NOTES_SYNC          1134
+#define IDC_DEFAULTS_AUTOSAVE   1135
+#define IDC_DEFAULTS_RESTORE    1136
+#define IDC_DEFAULTS_SYNC_ACCOUNTS 1137
+#define IDC_SYNC_GITHUB         1138
+#define IDC_SYNC_GOOGLE         1139
+#define IDC_SYNC_STATUS         1140
+#define IDC_SYNC_SIGNOUT        1141
 
 // Status bar parts
 #define SB_PART_MESSAGE         0
