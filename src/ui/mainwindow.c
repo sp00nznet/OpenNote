@@ -59,7 +59,7 @@ HWND MainWindow_Create(HINSTANCE hInstance) {
     HMENU hMenu = MenuBar_Create();
 
     HWND hwnd = CreateWindowExW(
-        0,
+        WS_EX_ACCEPTFILES,
         APP_CLASS_NAME,
         APP_NAME,
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
@@ -102,6 +102,40 @@ LRESULT CALLBACK MainWindow_WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
 
         case WM_NOTIFY:
             OnNotify(hwnd, (int)wParam, (LPNMHDR)lParam);
+            return 0;
+
+        case WM_DROPFILES:
+            {
+                HDROP hDrop = (HDROP)wParam;
+                UINT fileCount = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
+
+                for (UINT i = 0; i < fileCount; i++) {
+                    WCHAR filePath[MAX_PATH];
+                    if (DragQueryFileW(hDrop, i, filePath, MAX_PATH)) {
+                        // Check if it's a file (not a directory)
+                        DWORD attrs = GetFileAttributesW(filePath);
+                        if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+                            // Open the file in a new tab
+                            Document* doc = Document_CreateFromFile(filePath);
+                            if (doc) {
+                                int tabIdx = App_CreateTab(doc->title);
+                                if (tabIdx >= 0 && g_app->tabs[tabIdx]) {
+                                    Document_Destroy(g_app->tabs[tabIdx]->document);
+                                    g_app->tabs[tabIdx]->document = doc;
+                                    Document_Load(doc, g_app->tabs[tabIdx]->hEditor);
+                                    Editor_ApplyTheme(g_app->tabs[tabIdx]->hEditor, filePath);
+                                    TabControl_UpdateTabTitle(tabIdx);
+                                    App_AddRecentFile(filePath);
+                                } else {
+                                    Document_Destroy(doc);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                DragFinish(hDrop);
+            }
             return 0;
 
         case WM_PARENTNOTIFY:
