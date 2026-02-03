@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(curl:*)",
+      "Bash(cmake:*)",
+      "Bash(taskkill:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(unzip:*)",
+      "Bash(del \"%APPDATA%\\\\OpenNote\\\\opennote.db\")",
+      "Bash(timeout /t 3)",
+      "Bash(start \"\" \"C:\\\\SuperNote\\\\build\\\\bin\\\\OpenNote.exe\")",
+      "Bash(git add:*)"
+    ]
+  }
+}

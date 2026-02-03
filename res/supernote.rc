@@ -1,0 +1,152 @@
+#include <windows.h>
+#include <commctrl.h>
+#include "resource.h"
+
+// Version info
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
+FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+FILEFLAGS       0
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_APP
+FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName",      "OpenNote"
+            VALUE "FileDescription",  "OpenNote - Tabbed Notepad with SQLite"
+            VALUE "FileVersion",      "1.0.0.0"
+            VALUE "InternalName",     "OpenNote"
+            VALUE "LegalCopyright",   "Copyright (C) 2024"
+            VALUE "OriginalFilename", "OpenNote.exe"
+            VALUE "ProductName",      "OpenNote"
+            VALUE "ProductVersion",   "1.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+// Accelerator table
+IDA_ACCEL ACCELERATORS
+BEGIN
+    "N",        IDM_FILE_NEW,           VIRTKEY, CONTROL
+    "O",        IDM_FILE_OPEN,          VIRTKEY, CONTROL
+    "S",        IDM_FILE_SAVE,          VIRTKEY, CONTROL
+    "S",        IDM_FILE_SAVEAS,        VIRTKEY, CONTROL, SHIFT
+    "W",        IDM_FILE_CLOSE_TAB,     VIRTKEY, CONTROL
+    "P",        IDM_FILE_PRINT,         VIRTKEY, CONTROL
+
+    "Z",        IDM_EDIT_UNDO,          VIRTKEY, CONTROL
+    "Y",        IDM_EDIT_REDO,          VIRTKEY, CONTROL
+    "X",        IDM_EDIT_CUT,           VIRTKEY, CONTROL
+    "C",        IDM_EDIT_COPY,          VIRTKEY, CONTROL
+    "V",        IDM_EDIT_PASTE,         VIRTKEY, CONTROL
+    VK_DELETE,  IDM_EDIT_DELETE,        VIRTKEY
+    "F",        IDM_EDIT_FIND,          VIRTKEY, CONTROL
+    VK_F3,      IDM_EDIT_FIND_NEXT,     VIRTKEY
+    VK_F3,      IDM_EDIT_FIND_PREV,     VIRTKEY, SHIFT
+    "H",        IDM_EDIT_REPLACE,       VIRTKEY, CONTROL
+    "G",        IDM_EDIT_GOTO,          VIRTKEY, CONTROL
+    "A",        IDM_EDIT_SELECT_ALL,    VIRTKEY, CONTROL
+    VK_F5,      IDM_EDIT_TIME_DATE,     VIRTKEY
+
+    VK_OEM_PLUS,    IDM_VIEW_ZOOM_IN,   VIRTKEY, CONTROL
+    VK_OEM_MINUS,   IDM_VIEW_ZOOM_OUT,  VIRTKEY, CONTROL
+    "0",            IDM_VIEW_ZOOM_RESET, VIRTKEY, CONTROL
+END
+
+// Go To Line dialog
+IDD_GOTO DIALOGEX 0, 0, 200, 70
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Go To Line"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "&Line number:", IDC_STATIC, 10, 15, 50, 10
+    EDITTEXT        IDC_GOTO_LINE, 65, 12, 125, 14, ES_AUTOHSCROLL | ES_NUMBER
+    DEFPUSHBUTTON   "Go To", IDOK, 85, 45, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 140, 45, 50, 14
+END
+
+// About dialog
+IDD_ABOUT DIALOGEX 0, 0, 220, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About OpenNote"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "OpenNote", IDC_STATIC, 60, 15, 100, 12
+    LTEXT           "Version 1.0.0", IDC_STATIC, 60, 30, 100, 10
+    LTEXT           "A tabbed text editor with SQLite note storage", IDC_STATIC, 60, 45, 150, 10
+    LTEXT           "Copyright (C) 2024", IDC_STATIC, 60, 60, 100, 10
+    DEFPUSHBUTTON   "OK", IDOK, 85, 78, 50, 14
+END
+
+// Notes Browser dialog
+IDD_NOTES_BROWSER DIALOGEX 0, 0, 350, 250
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Notes Browser"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "&Search:", IDC_STATIC, 10, 12, 30, 10
+    EDITTEXT        IDC_NOTES_SEARCH, 45, 10, 200, 14, ES_AUTOHSCROLL
+    CONTROL         "", IDC_NOTES_LIST, WC_LISTVIEW, LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 10, 30, 330, 180
+    PUSHBUTTON      "&New Note", IDC_NOTES_NEW, 10, 220, 60, 14
+    PUSHBUTTON      "&Delete", IDC_NOTES_DELETE, 75, 220, 50, 14
+    DEFPUSHBUTTON   "&Open", IDOK, 230, 220, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 285, 220, 50, 14
+END
+
+// Defaults settings dialog
+IDD_DEFAULTS DIALOGEX 0, 0, 220, 105
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Default Settings"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "&Font Size:", IDC_STATIC, 15, 20, 40, 10
+    COMBOBOX        IDC_DEFAULTS_FONTSIZE, 60, 18, 100, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Theme:", IDC_STATIC, 15, 45, 40, 10
+    COMBOBOX        IDC_DEFAULTS_THEME, 60, 43, 100, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK", IDOK, 110, 80, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 165, 80, 50, 14
+END
+
+// Find in All Tabs dialog
+IDD_FIND_IN_TABS DIALOGEX 0, 0, 320, 200
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Find in Tabs"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "Fi&nd what:", IDC_STATIC, 10, 12, 45, 10
+    EDITTEXT        IDC_FIND_IN_TABS_TEXT, 60, 10, 180, 14, ES_AUTOHSCROLL
+    AUTOCHECKBOX    "Match &case", IDC_MATCH_CASE, 10, 32, 60, 10
+    AUTOCHECKBOX    "&Whole word", IDC_WHOLE_WORD, 80, 32, 60, 10
+    LTEXT           "Search in:", IDC_STATIC, 10, 52, 40, 10
+    CONTROL         "", IDC_TABS_LIST, WC_LISTVIEW, LVS_REPORT | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 10, 64, 230, 100
+    PUSHBUTTON      "Select &All", IDC_SELECT_ALL_TABS, 250, 64, 60, 14
+    DEFPUSHBUTTON   "&Find All", IDC_FIND_ALL_TABS, 250, 84, 60, 14
+    PUSHBUTTON      "Close", IDCANCEL, 250, 170, 60, 14
+END
+
+// Replace in All Tabs dialog
+IDD_REPLACE_IN_TABS DIALOGEX 0, 0, 320, 220
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Replace in Tabs"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "Fi&nd what:", IDC_STATIC, 10, 12, 45, 10
+    EDITTEXT        IDC_FIND_IN_TABS_TEXT, 60, 10, 180, 14, ES_AUTOHSCROLL
+    LTEXT           "Rep&lace with:", IDC_STATIC, 10, 32, 48, 10
+    EDITTEXT        IDC_REPLACE_IN_TABS_TEXT, 60, 30, 180, 14, ES_AUTOHSCROLL
+    AUTOCHECKBOX    "Match &case", IDC_MATCH_CASE, 10, 52, 60, 10
+    AUTOCHECKBOX    "&Whole word", IDC_WHOLE_WORD, 80, 52, 60, 10
+    LTEXT           "Replace in:", IDC_STATIC, 10, 72, 45, 10
+    CONTROL         "", IDC_TABS_LIST, WC_LISTVIEW, LVS_REPORT | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 10, 84, 230, 100
+    PUSHBUTTON      "Select &All", IDC_SELECT_ALL_TABS, 250, 84, 60, 14
+    DEFPUSHBUTTON   "Replace &All", IDC_REPLACE_ALL_TABS, 250, 104, 60, 14
+    PUSHBUTTON      "Close", IDCANCEL, 250, 190, 60, 14
+END
