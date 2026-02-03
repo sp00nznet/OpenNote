@@ -155,6 +155,13 @@ BOOL Database_Initialize(void) {
     sqlite3_exec(g_db, "ALTER TABLE notes ADD COLUMN content_hash TEXT;", NULL, NULL, NULL);
     sqlite3_exec(g_db, "CREATE INDEX IF NOT EXISTS idx_notes_hash ON notes(content_hash);", NULL, NULL, NULL);
 
+    // Migration: Add gist_id and last_synced columns for GitHub sync
+    sqlite3_exec(g_db, "ALTER TABLE notes ADD COLUMN gist_id TEXT;", NULL, NULL, NULL);
+    sqlite3_exec(g_db, "ALTER TABLE notes ADD COLUMN last_synced TEXT;", NULL, NULL, NULL);
+
+    // Migration: Add drive_file_id column for Google Drive sync
+    sqlite3_exec(g_db, "ALTER TABLE notes ADD COLUMN drive_file_id TEXT;", NULL, NULL, NULL);
+
     return TRUE;
 }
 
