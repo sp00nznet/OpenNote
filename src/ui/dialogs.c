@@ -1560,3 +1560,340 @@ static INT_PTR CALLBACK SyncAccountsProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
 void Dialogs_SyncAccounts(HWND hParent) {
     DialogBoxW(g_app->hInstance, MAKEINTRESOURCEW(IDD_SYNC_ACCOUNTS), hParent, SyncAccountsProc);
 }
+
+// ============================================================================
+// Markdown Preview - Opens in default browser
+// ============================================================================
+
+// Simple markdown to HTML conversion
+static WCHAR* MarkdownToHtml(const WCHAR* markdown) {
+    if (!markdown) return NULL;
+
+    // Allocate buffer (generous size for HTML tags)
+    size_t mdLen = wcslen(markdown);
+    size_t bufSize = mdLen * 4 + 4096;  // Extra space for HTML wrapper and tags
+    WCHAR* html = (WCHAR*)malloc(bufSize * sizeof(WCHAR));
+    if (!html) return NULL;
+
+    // HTML header with styling
+    wcscpy_s(html, bufSize,
+        L"<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
+        L"<style>"
+        L"body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; margin: 0; "
+        L"       background: #ffffff; color: #333; line-height: 1.6; }"
+        L"img { max-width: 100%; height: auto; display: block; margin: 10px 0; }"
+        L"pre, code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; "
+        L"           font-family: Consolas, monospace; }"
+        L"pre { padding: 10px; overflow-x: auto; }"
+        L"h1, h2, h3 { color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px; }"
+        L"a { color: #3498db; }"
+        L"blockquote { border-left: 4px solid #3498db; margin: 10px 0; padding-left: 15px; color: #666; }"
+        L"hr { border: none; border-top: 1px solid #eee; margin: 20px 0; }"
+        L"</style></head><body>");
+
+    WCHAR* out = html + wcslen(html);
+    const WCHAR* p = markdown;
+    BOOL inCodeBlock = FALSE;
+    BOOL lineStart = TRUE;
+
+    while (*p) {
+        // Code block (```)
+        if (lineStart && wcsncmp(p, L"```", 3) == 0) {
+            if (inCodeBlock) {
+                wcscpy_s(out, bufSize - (out - html), L"</code></pre>");
+                out += wcslen(L"</code></pre>");
+                inCodeBlock = FALSE;
+            } else {
+                wcscpy_s(out, bufSize - (out - html), L"<pre><code>");
+                out += wcslen(L"<pre><code>");
+                inCodeBlock = TRUE;
+            }
+            p += 3;
+            // Skip to end of line
+            while (*p && *p != L'\n') p++;
+            if (*p == L'\n') p++;
+            lineStart = TRUE;
+            continue;
+        }
+
+        // Inside code block - escape HTML
+        if (inCodeBlock) {
+            if (*p == L'<') {
+                wcscpy_s(out, bufSize - (out - html), L"&lt;");
+                out += 4;
+            } else if (*p == L'>') {
+                wcscpy_s(out, bufSize - (out - html), L"&gt;");
+                out += 4;
+            } else if (*p == L'\n') {
+                *out++ = L'\n';
+                lineStart = TRUE;
+            } else {
+                *out++ = *p;
+                lineStart = FALSE;
+            }
+            p++;
+            continue;
+        }
+
+        // Headers at line start
+        if (lineStart) {
+            int level = 0;
+            const WCHAR* hp = p;
+            while (*hp == L'#' && level < 6) { hp++; level++; }
+            if (level > 0 && (*hp == L' ' || *hp == L'\t')) {
+                hp++;  // Skip space after #
+                swprintf_s(out, bufSize - (out - html), L"<h%d>", level);
+                out += wcslen(out);
+                // Copy header text
+                while (*hp && *hp != L'\n') {
+                    *out++ = *hp++;
+                }
+                swprintf_s(out, bufSize - (out - html), L"</h%d>", level);
+                out += wcslen(out);
+                p = hp;
+                if (*p == L'\n') {
+                    p++;
+                    lineStart = TRUE;
+                }
+                continue;
+            }
+        }
+
+        // Image: ![alt](url)
+        if (*p == L'!' && *(p+1) == L'[') {
+            const WCHAR* altStart = p + 2;
+            const WCHAR* altEnd = wcschr(altStart, L']');
+            if (altEnd && *(altEnd+1) == L'(') {
+                const WCHAR* urlStart = altEnd + 2;
+                const WCHAR* urlEnd = wcschr(urlStart, L')');
+                if (urlEnd) {
+                    // Extract alt text
+                    WCHAR alt[256] = {0};
+                    int altLen = (int)(altEnd - altStart);
+                    if (altLen > 255) altLen = 255;
+                    wcsncpy_s(alt, 256, altStart, altLen);
+
+                    // Extract URL
+                    WCHAR url[1024] = {0};
+                    int urlLen = (int)(urlEnd - urlStart);
+                    if (urlLen > 1023) urlLen = 1023;
+                    wcsncpy_s(url, 1024, urlStart, urlLen);
+
+                    // Generate img tag
+                    swprintf_s(out, bufSize - (out - html), L"<img src=\"%s\" alt=\"%s\">", url, alt);
+                    out += wcslen(out);
+                    p = urlEnd + 1;
+                    lineStart = FALSE;
+                    continue;
+                }
+            }
+        }
+
+        // Link: [text](url)
+        if (*p == L'[') {
+            const WCHAR* textStart = p + 1;
+            const WCHAR* textEnd = wcschr(textStart, L']');
+            if (textEnd && *(textEnd+1) == L'(') {
+                const WCHAR* urlStart = textEnd + 2;
+                const WCHAR* urlEnd = wcschr(urlStart, L')');
+                if (urlEnd) {
+                    WCHAR text[256] = {0};
+                    int textLen = (int)(textEnd - textStart);
+                    if (textLen > 255) textLen = 255;
+                    wcsncpy_s(text, 256, textStart, textLen);
+
+                    WCHAR url[1024] = {0};
+                    int urlLen = (int)(urlEnd - urlStart);
+                    if (urlLen > 1023) urlLen = 1023;
+                    wcsncpy_s(url, 1024, urlStart, urlLen);
+
+                    swprintf_s(out, bufSize - (out - html), L"<a href=\"%s\" target=\"_blank\">%s</a>", url, text);
+                    out += wcslen(out);
+                    p = urlEnd + 1;
+                    lineStart = FALSE;
+                    continue;
+                }
+            }
+        }
+
+        // Bold: **text** or __text__
+        if ((*p == L'*' && *(p+1) == L'*') || (*p == L'_' && *(p+1) == L'_')) {
+            WCHAR marker = *p;
+            const WCHAR* textStart = p + 2;
+            const WCHAR* textEnd = wcsstr(textStart, (marker == L'*') ? L"**" : L"__");
+            if (textEnd) {
+                wcscpy_s(out, bufSize - (out - html), L"<strong>");
+                out += 8;
+                while (textStart < textEnd) {
+                    *out++ = *textStart++;
+                }
+                wcscpy_s(out, bufSize - (out - html), L"</strong>");
+                out += 9;
+                p = textEnd + 2;
+                lineStart = FALSE;
+                continue;
+            }
+        }
+
+        // Italic: *text* or _text_
+        if ((*p == L'*' || *p == L'_') && *(p+1) != *p) {
+            WCHAR marker = *p;
+            const WCHAR* textStart = p + 1;
+            const WCHAR* textEnd = wcschr(textStart, marker);
+            if (textEnd && textEnd > textStart) {
+                wcscpy_s(out, bufSize - (out - html), L"<em>");
+                out += 4;
+                while (textStart < textEnd) {
+                    *out++ = *textStart++;
+                }
+                wcscpy_s(out, bufSize - (out - html), L"</em>");
+                out += 5;
+                p = textEnd + 1;
+                lineStart = FALSE;
+                continue;
+            }
+        }
+
+        // Horizontal rule
+        if (lineStart && (wcsncmp(p, L"---", 3) == 0 || wcsncmp(p, L"***", 3) == 0)) {
+            wcscpy_s(out, bufSize - (out - html), L"<hr>");
+            out += 4;
+            p += 3;
+            while (*p && *p != L'\n') p++;
+            if (*p == L'\n') p++;
+            lineStart = TRUE;
+            continue;
+        }
+
+        // Blockquote
+        if (lineStart && *p == L'>') {
+            p++;
+            if (*p == L' ') p++;
+            wcscpy_s(out, bufSize - (out - html), L"<blockquote>");
+            out += 12;
+            while (*p && *p != L'\n') {
+                *out++ = *p++;
+            }
+            wcscpy_s(out, bufSize - (out - html), L"</blockquote>");
+            out += 13;
+            if (*p == L'\n') {
+                p++;
+                lineStart = TRUE;
+            }
+            continue;
+        }
+
+        // Line breaks
+        if (*p == L'\n') {
+            // Double newline = paragraph
+            if (*(p+1) == L'\n') {
+                wcscpy_s(out, bufSize - (out - html), L"<br><br>");
+                out += 8;
+                p += 2;
+            } else {
+                wcscpy_s(out, bufSize - (out - html), L"<br>");
+                out += 4;
+                p++;
+            }
+            lineStart = TRUE;
+            continue;
+        }
+
+        // Escape HTML special chars
+        if (*p == L'<') {
+            wcscpy_s(out, bufSize - (out - html), L"&lt;");
+            out += 4;
+        } else if (*p == L'>') {
+            wcscpy_s(out, bufSize - (out - html), L"&gt;");
+            out += 4;
+        } else if (*p == L'&') {
+            wcscpy_s(out, bufSize - (out - html), L"&amp;");
+            out += 5;
+        } else {
+            *out++ = *p;
+        }
+
+        lineStart = FALSE;
+        p++;
+    }
+
+    // Close code block if still open
+    if (inCodeBlock) {
+        wcscpy_s(out, bufSize - (out - html), L"</code></pre>");
+        out += wcslen(L"</code></pre>");
+    }
+
+    // HTML footer
+    wcscpy_s(out, bufSize - (out - html), L"</body></html>");
+    out += wcslen(L"</body></html>");
+    *out = L'\0';
+
+    return html;
+}
+
+// Show markdown preview - writes HTML to temp file and opens in default browser
+void Dialogs_MarkdownPreview(HWND hParent, HWND hEditor) {
+    (void)hParent;
+
+    // Get text from editor
+    WCHAR* text = Editor_GetText(hEditor);
+    if (!text || !text[0]) {
+        free(text);
+        MessageBoxW(hParent, L"No content to preview.", APP_NAME, MB_ICONINFORMATION);
+        return;
+    }
+
+    // Convert markdown to HTML
+    WCHAR* html = MarkdownToHtml(text);
+    free(text);
+
+    if (!html) {
+        MessageBoxW(hParent, L"Failed to convert markdown.", APP_NAME, MB_ICONERROR);
+        return;
+    }
+
+    // Get temp directory
+    WCHAR tempPath[MAX_PATH];
+    GetTempPathW(MAX_PATH, tempPath);
+
+    // Create temp HTML file with unique name
+    WCHAR tempFile[MAX_PATH];
+    swprintf_s(tempFile, MAX_PATH, L"%sOpenNote_Preview_%u.html", tempPath, GetTickCount());
+
+    // Write HTML to file (UTF-8 with BOM for browser compatibility)
+    HANDLE hFile = CreateFileW(tempFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        free(html);
+        MessageBoxW(hParent, L"Failed to create preview file.", APP_NAME, MB_ICONERROR);
+        return;
+    }
+
+    // Write UTF-8 BOM
+    BYTE bom[] = {0xEF, 0xBB, 0xBF};
+    DWORD written;
+    WriteFile(hFile, bom, 3, &written, NULL);
+
+    // Convert HTML to UTF-8 and write
+    int utf8Len = WideCharToMultiByte(CP_UTF8, 0, html, -1, NULL, 0, NULL, NULL);
+    if (utf8Len > 0) {
+        char* utf8 = (char*)malloc(utf8Len);
+        if (utf8) {
+            WideCharToMultiByte(CP_UTF8, 0, html, -1, utf8, utf8Len, NULL, NULL);
+            WriteFile(hFile, utf8, utf8Len - 1, &written, NULL);  // -1 to exclude null terminator
+            free(utf8);
+        }
+    }
+
+    CloseHandle(hFile);
+    free(html);
+
+    // Open in default browser
+    HINSTANCE result = ShellExecuteW(NULL, L"open", tempFile, NULL, NULL, SW_SHOWNORMAL);
+    if ((INT_PTR)result <= 32) {
+        MessageBoxW(hParent, L"Failed to open preview in browser.", APP_NAME, MB_ICONERROR);
+        DeleteFileW(tempFile);
+    }
+
+    // Note: We leave the temp file for the browser to read.
+    // It will be cleaned up on next Windows restart or by temp file cleanup.
+}

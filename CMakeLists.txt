@@ -83,6 +83,7 @@ target_link_libraries(OpenNote PRIVATE
     imm32
     ole32
     oleaut32
+    uuid
     msimg32
     shcore
 )
