@@ -9,12 +9,15 @@ static const char* SCHEMA_SQL =
     "    id              INTEGER PRIMARY KEY AUTOINCREMENT,"
     "    title           TEXT NOT NULL DEFAULT 'Untitled',"
     "    content         TEXT NOT NULL DEFAULT '',"
+    "    content_hash    TEXT,"
     "    created_at      TEXT DEFAULT (datetime('now')),"
     "    updated_at      TEXT DEFAULT (datetime('now')),"
     "    is_pinned       INTEGER DEFAULT 0,"
     "    is_archived     INTEGER DEFAULT 0,"
     "    category_id     INTEGER"
     ");"
+
+    "CREATE INDEX IF NOT EXISTS idx_notes_hash ON notes(content_hash);"
 
     "CREATE TABLE IF NOT EXISTS categories ("
     "    id          INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -147,6 +150,10 @@ BOOL Database_Initialize(void) {
 
     // Migration: Add target_url column to links table if it doesn't exist
     sqlite3_exec(g_db, "ALTER TABLE links ADD COLUMN target_url TEXT;", NULL, NULL, NULL);
+
+    // Migration: Add content_hash column to notes table if it doesn't exist
+    sqlite3_exec(g_db, "ALTER TABLE notes ADD COLUMN content_hash TEXT;", NULL, NULL, NULL);
+    sqlite3_exec(g_db, "CREATE INDEX IF NOT EXISTS idx_notes_hash ON notes(content_hash);", NULL, NULL, NULL);
 
     return TRUE;
 }

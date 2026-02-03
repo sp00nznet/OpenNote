@@ -1,14 +1,92 @@
 #include "supernote.h"
+#include <wincrypt.h>
 
-// Create a new note
+// Calculate MD5 hash of content and return as hex string
+static BOOL CalculateContentHash(const char* content, char* hashOut, int hashOutSize) {
+    if (!content || !hashOut || hashOutSize < 33) return FALSE;
+
+    HCRYPTPROV hProv = 0;
+    HCRYPTHASH hHash = 0;
+    BYTE hash[16];
+    DWORD hashLen = 16;
+    BOOL success = FALSE;
+
+    if (CryptAcquireContextW(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
+        if (CryptCreateHash(hProv, CALG_MD5, 0, 0, &hHash)) {
+            if (CryptHashData(hHash, (const BYTE*)content, (DWORD)strlen(content), 0)) {
+                if (CryptGetHashParam(hHash, HP_HASHVAL, hash, &hashLen, 0)) {
+                    // Convert to hex string
+                    for (int i = 0; i < 16; i++) {
+                        sprintf_s(hashOut + i * 2, 3, "%02x", hash[i]);
+                    }
+                    hashOut[32] = '\0';
+                    success = TRUE;
+                }
+            }
+            CryptDestroyHash(hHash);
+        }
+        CryptReleaseContext(hProv, 0);
+    }
+
+    return success;
+}
+
+// Find note ID by content hash (returns -1 if not found)
+static int Notes_FindByHash(const char* hash) {
+    sqlite3* db = Database_GetHandle();
+    if (!db || !hash) return -1;
+
+    sqlite3_stmt* stmt;
+    const char* sql = "SELECT id FROM notes WHERE content_hash = ? LIMIT 1";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        return -1;
+    }
+
+    sqlite3_bind_text(stmt, 1, hash, -1, SQLITE_STATIC);
+
+    int noteId = -1;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        noteId = sqlite3_column_int(stmt, 0);
+    }
+
+    sqlite3_finalize(stmt);
+    return noteId;
+}
+
+// Create a new note (returns existing note ID if duplicate content exists)
 int Notes_Create(const WCHAR* title, const WCHAR* content) {
     sqlite3* db = Database_GetHandle();
     if (!db) return -1;
 
+    // Convert content to UTF-8 first (needed for hash and insert)
+    char* contentUtf8 = NULL;
+    char contentHash[33] = {0};
+
+    if (content && content[0]) {
+        int contentLen = (int)wcslen(content);
+        int bufSize = contentLen * 3 + 1;
+        contentUtf8 = (char*)malloc(bufSize);
+        if (contentUtf8) {
+            WideCharToMultiByte(CP_UTF8, 0, content, -1, contentUtf8, bufSize, NULL, NULL);
+
+            // Calculate hash and check for duplicates
+            if (CalculateContentHash(contentUtf8, contentHash, sizeof(contentHash))) {
+                int existingId = Notes_FindByHash(contentHash);
+                if (existingId > 0) {
+                    // Duplicate found - return existing note ID
+                    free(contentUtf8);
+                    return existingId;
+                }
+            }
+        }
+    }
+
     sqlite3_stmt* stmt;
-    const char* sql = "INSERT INTO notes (title, content) VALUES (?, ?)";
+    const char* sql = "INSERT INTO notes (title, content, content_hash) VALUES (?, ?, ?)";
 
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        if (contentUtf8) free(contentUtf8);
         return -1;
     }
 
@@ -18,24 +96,24 @@ int Notes_Create(const WCHAR* title, const WCHAR* content) {
                         titleUtf8, sizeof(titleUtf8), NULL, NULL);
     sqlite3_bind_text(stmt, 1, titleUtf8, -1, SQLITE_STATIC);
 
-    // Convert content to UTF-8
-    if (content && content[0]) {
-        int contentLen = (int)wcslen(content);
-        int bufSize = contentLen * 3 + 1;
-        char* contentUtf8 = (char*)malloc(bufSize);
-        if (contentUtf8) {
-            WideCharToMultiByte(CP_UTF8, 0, content, -1, contentUtf8, bufSize, NULL, NULL);
-            sqlite3_bind_text(stmt, 2, contentUtf8, -1, SQLITE_TRANSIENT);
-            free(contentUtf8);
-        } else {
-            sqlite3_bind_text(stmt, 2, "", -1, SQLITE_STATIC);
-        }
+    // Bind content
+    if (contentUtf8) {
+        sqlite3_bind_text(stmt, 2, contentUtf8, -1, SQLITE_TRANSIENT);
     } else {
         sqlite3_bind_text(stmt, 2, "", -1, SQLITE_STATIC);
     }
 
+    // Bind hash
+    if (contentHash[0]) {
+        sqlite3_bind_text(stmt, 3, contentHash, -1, SQLITE_STATIC);
+    } else {
+        sqlite3_bind_null(stmt, 3);
+    }
+
     int result = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
+
+    if (contentUtf8) free(contentUtf8);
 
     if (result != SQLITE_DONE) {
         return -1;
@@ -101,10 +179,25 @@ BOOL Notes_Update(int id, const WCHAR* title, const WCHAR* content) {
     sqlite3* db = Database_GetHandle();
     if (!db) return FALSE;
 
+    // Convert content to UTF-8 and calculate hash
+    char* contentUtf8 = NULL;
+    char contentHash[33] = {0};
+
+    if (content && content[0]) {
+        int contentLen = (int)wcslen(content);
+        int bufSize = contentLen * 3 + 1;
+        contentUtf8 = (char*)malloc(bufSize);
+        if (contentUtf8) {
+            WideCharToMultiByte(CP_UTF8, 0, content, -1, contentUtf8, bufSize, NULL, NULL);
+            CalculateContentHash(contentUtf8, contentHash, sizeof(contentHash));
+        }
+    }
+
     sqlite3_stmt* stmt;
-    const char* sql = "UPDATE notes SET title = ?, content = ?, updated_at = datetime('now') WHERE id = ?";
+    const char* sql = "UPDATE notes SET title = ?, content = ?, content_hash = ?, updated_at = datetime('now') WHERE id = ?";
 
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        if (contentUtf8) free(contentUtf8);
         return FALSE;
     }
 
@@ -114,26 +207,26 @@ BOOL Notes_Update(int id, const WCHAR* title, const WCHAR* content) {
                         titleUtf8, sizeof(titleUtf8), NULL, NULL);
     sqlite3_bind_text(stmt, 1, titleUtf8, -1, SQLITE_STATIC);
 
-    // Convert content to UTF-8
-    if (content && content[0]) {
-        int contentLen = (int)wcslen(content);
-        int bufSize = contentLen * 3 + 1;
-        char* contentUtf8 = (char*)malloc(bufSize);
-        if (contentUtf8) {
-            WideCharToMultiByte(CP_UTF8, 0, content, -1, contentUtf8, bufSize, NULL, NULL);
-            sqlite3_bind_text(stmt, 2, contentUtf8, -1, SQLITE_TRANSIENT);
-            free(contentUtf8);
-        } else {
-            sqlite3_bind_text(stmt, 2, "", -1, SQLITE_STATIC);
-        }
+    // Bind content
+    if (contentUtf8) {
+        sqlite3_bind_text(stmt, 2, contentUtf8, -1, SQLITE_TRANSIENT);
     } else {
         sqlite3_bind_text(stmt, 2, "", -1, SQLITE_STATIC);
     }
 
-    sqlite3_bind_int(stmt, 3, id);
+    // Bind hash
+    if (contentHash[0]) {
+        sqlite3_bind_text(stmt, 3, contentHash, -1, SQLITE_STATIC);
+    } else {
+        sqlite3_bind_null(stmt, 3);
+    }
+
+    sqlite3_bind_int(stmt, 4, id);
 
     int result = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
+
+    if (contentUtf8) free(contentUtf8);
 
     return result == SQLITE_DONE;
 }
@@ -195,33 +288,48 @@ BOOL Notes_SetContent(int id, const WCHAR* content) {
     sqlite3* db = Database_GetHandle();
     if (!db) return FALSE;
 
-    sqlite3_stmt* stmt;
-    const char* sql = "UPDATE notes SET content = ?, updated_at = datetime('now') WHERE id = ?";
+    // Convert content to UTF-8 and calculate hash
+    char* contentUtf8 = NULL;
+    char contentHash[33] = {0};
 
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
-        return FALSE;
-    }
-
-    // Convert content to UTF-8
     if (content && content[0]) {
         int contentLen = (int)wcslen(content);
         int bufSize = contentLen * 3 + 1;
-        char* contentUtf8 = (char*)malloc(bufSize);
+        contentUtf8 = (char*)malloc(bufSize);
         if (contentUtf8) {
             WideCharToMultiByte(CP_UTF8, 0, content, -1, contentUtf8, bufSize, NULL, NULL);
-            sqlite3_bind_text(stmt, 1, contentUtf8, -1, SQLITE_TRANSIENT);
-            free(contentUtf8);
-        } else {
-            sqlite3_bind_text(stmt, 1, "", -1, SQLITE_STATIC);
+            CalculateContentHash(contentUtf8, contentHash, sizeof(contentHash));
         }
+    }
+
+    sqlite3_stmt* stmt;
+    const char* sql = "UPDATE notes SET content = ?, content_hash = ?, updated_at = datetime('now') WHERE id = ?";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        if (contentUtf8) free(contentUtf8);
+        return FALSE;
+    }
+
+    // Bind content
+    if (contentUtf8) {
+        sqlite3_bind_text(stmt, 1, contentUtf8, -1, SQLITE_TRANSIENT);
     } else {
         sqlite3_bind_text(stmt, 1, "", -1, SQLITE_STATIC);
     }
 
-    sqlite3_bind_int(stmt, 2, id);
+    // Bind hash
+    if (contentHash[0]) {
+        sqlite3_bind_text(stmt, 2, contentHash, -1, SQLITE_STATIC);
+    } else {
+        sqlite3_bind_null(stmt, 2);
+    }
+
+    sqlite3_bind_int(stmt, 3, id);
 
     int result = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
+
+    if (contentUtf8) free(contentUtf8);
 
     return result == SQLITE_DONE;
 }
