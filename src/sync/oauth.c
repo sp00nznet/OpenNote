@@ -382,11 +382,6 @@ BOOL OAuth_GoogleLogin(HWND hParent, OAuthToken* tokenOut) {
              "&access_type=offline&state=opennote",
              GOOGLE_AUTH_URL, GOOGLE_CLIENT_ID, OAUTH_CALLBACK_PORT);
 
-    // Debug: show auth URL
-    WCHAR debugUrl[2048];
-    MultiByteToWideChar(CP_UTF8, 0, authUrl, -1, debugUrl, 2048);
-    MessageBoxW(NULL, debugUrl, L"Google Auth URL (Debug)", MB_OK);
-
     // Open browser
     WCHAR authUrlW[2048];
     MultiByteToWideChar(CP_UTF8, 0, authUrl, -1, authUrlW, 2048);
