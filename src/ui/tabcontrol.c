@@ -6,6 +6,7 @@
 static WNDPROC g_origTabProc = NULL;
 static DWORD g_lastClickTime = 0;
 static POINT g_lastClickPos = {0, 0};
+static BOOL g_inContextMenu = FALSE;  // Guard against re-entrant context menus
 
 // Subclass procedure for tab control
 static LRESULT CALLBACK TabSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -181,8 +182,14 @@ void TabControl_OnSelChange(void) {
 
 // Show context menu for empty tab area
 static void TabControl_ShowEmptyAreaMenu(int x, int y) {
+    if (g_inContextMenu) return;  // Prevent re-entrant calls
+    g_inContextMenu = TRUE;
+
     HMENU hMenu = CreatePopupMenu();
-    if (!hMenu) return;
+    if (!hMenu) {
+        g_inContextMenu = FALSE;
+        return;
+    }
 
     AppendMenuW(hMenu, MF_STRING, IDM_FILE_NEW, L"&New");
     AppendMenuW(hMenu, MF_STRING, IDM_FILE_OPEN, L"&Open...");
@@ -197,11 +204,13 @@ static void TabControl_ShowEmptyAreaMenu(int x, int y) {
     }
 
     DestroyMenu(hMenu);
+    g_inContextMenu = FALSE;
 }
 
 // Handle right-click on tab
 void TabControl_OnRightClick(int x, int y) {
     if (!g_app->hTabControl) return;
+    if (g_inContextMenu) return;  // Prevent re-entrant calls
 
     // Find which tab was clicked
     POINT pt = { x, y };
@@ -223,8 +232,14 @@ void TabControl_OnRightClick(int x, int y) {
 
 // Show context menu
 void TabControl_ShowContextMenu(int tabIndex, int x, int y) {
+    if (g_inContextMenu) return;  // Prevent re-entrant calls
+    g_inContextMenu = TRUE;
+
     HMENU hMenu = CreatePopupMenu();
-    if (!hMenu) return;
+    if (!hMenu) {
+        g_inContextMenu = FALSE;
+        return;
+    }
 
     AppendMenuW(hMenu, MF_STRING, IDM_FILE_SAVE, L"&Save");
     AppendMenuW(hMenu, MF_STRING, IDM_FILE_SAVEAS, L"Save &As...");
@@ -299,4 +314,5 @@ void TabControl_ShowContextMenu(int tabIndex, int x, int y) {
     }
 
     DestroyMenu(hMenu);
+    g_inContextMenu = FALSE;
 }
