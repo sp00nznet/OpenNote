@@ -512,11 +512,16 @@ INT_PTR CALLBACK NotesBrowserProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
                         if (!g_app->syncProvider || g_app->syncProvider[0] == L'\0') {
                             MessageBoxW(hwnd, L"Please sign in to a cloud account first.\n\nGo to Settings > Default Settings > Sync Accounts to connect.",
                                         APP_NAME, MB_ICONINFORMATION);
-                        } else {
-                            // TODO: Implement actual sync
-                            WCHAR msg[256];
-                            swprintf_s(msg, 256, L"Syncing notes with %s...\n\nThis feature is coming soon!", g_app->syncProvider);
-                            MessageBoxW(hwnd, msg, APP_NAME, MB_ICONINFORMATION);
+                        } else if (wcscmp(g_app->syncProvider, L"GitHub") == 0) {
+                            // Sync with GitHub Gists
+                            GitHubSync_SyncAll(hwnd);
+                            // Refresh the notes list after sync
+                            SendMessageW(hwnd, WM_COMMAND, MAKEWPARAM(IDC_NOTES_SEARCH, EN_CHANGE), 0);
+                        } else if (wcscmp(g_app->syncProvider, L"Google Drive") == 0) {
+                            // Sync with Google Drive
+                            GoogleSync_SyncAll(hwnd);
+                            // Refresh the notes list after sync
+                            SendMessageW(hwnd, WM_COMMAND, MAKEWPARAM(IDC_NOTES_SEARCH, EN_CHANGE), 0);
                         }
                     }
                     return TRUE;

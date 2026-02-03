@@ -50,6 +50,8 @@ set(SUPERNOTE_SOURCES
     src/db/notes_repo.c
     src/db/links_repo.c
     src/sync/oauth.c
+    src/sync/github_sync.c
+    src/sync/google_sync.c
 )
 
 # Resource file
