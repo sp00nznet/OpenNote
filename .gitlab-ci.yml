@@ -47,32 +47,12 @@ package:
   needs:
     - build
   script:
-    # Check what we have from build
-    - Write-Host "=== Checking build artifacts ==="
-    - Get-ChildItem -Recurse build\bin -ErrorAction SilentlyContinue
-    # Install Inno Setup
-    - Write-Host "=== Installing Inno Setup ==="
     - choco install innosetup -y --no-progress
-    - $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-    - |
-      if (-not (Test-Path $isccPath)) {
-        Write-Host "ERROR: ISCC.exe not found at $isccPath"
-        Get-ChildItem "C:\Program Files (x86)" -Directory | Where-Object { $_.Name -like "*Inno*" }
-        exit 1
-      }
-    # Create output directory
     - New-Item -ItemType Directory -Force -Path build\installer
-    # Build the installer
-    - Write-Host "=== Building installer ==="
-    - '& $isccPath installer\OpenNoteSetup.iss'
-    - Write-Host "=== Checking installer output ==="
-    - Get-ChildItem build\installer -ErrorAction SilentlyContinue
-    # Create dist folder with both exe and installer
+    - '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\OpenNoteSetup.iss'
     - New-Item -ItemType Directory -Force -Path dist
     - Copy-Item -Path build\bin\OpenNote.exe -Destination dist\ -Force
     - Copy-Item -Path build\installer\OpenNoteSetup.exe -Destination dist\ -Force
-    - Write-Host "=== Final dist contents ==="
-    - Get-ChildItem dist
   artifacts:
     name: "OpenNote-${CI_COMMIT_SHORT_SHA}"
     paths:
@@ -89,13 +69,9 @@ deploy:
     - job: package
       artifacts: true
   script:
-    - Write-Host "=== Contents of dist folder ==="
-    - Get-ChildItem dist -ErrorAction SilentlyContinue
     - 'net use R: \\192.168.100.22\releases gitlab /user:root'
-    - 'New-Item -ItemType Directory -Force -Path "R:\$env:CI_PROJECT_NAME"'
-    - 'Copy-Item -Path "dist\*" -Destination "R:\$env:CI_PROJECT_NAME" -Force'
-    - Write-Host "=== Contents of release folder ==="
-    - 'Get-ChildItem "R:\$env:CI_PROJECT_NAME"'
+    - 'New-Item -ItemType Directory -Force -Path "R:\$env:CI_PROJECT_NAME\$env:CI_COMMIT_REF_NAME"'
+    - 'Copy-Item -Path "dist\*" -Destination "R:\$env:CI_PROJECT_NAME\$env:CI_COMMIT_REF_NAME" -Force'
     - 'net use R: /delete'
   rules:
     - if: $CI_COMMIT_TAG
