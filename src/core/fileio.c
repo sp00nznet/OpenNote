@@ -7,17 +7,23 @@ static const BYTE UTF16LE_BOM[] = { 0xFF, 0xFE };
 // UTF-16 BE BOM
 static const BYTE UTF16BE_BOM[] = { 0xFE, 0xFF };
 
-// Detect encoding from BOM
-TextEncoding FileIO_DetectEncoding(const BYTE* data, size_t size) {
+// Detect encoding from BOM (also returns actual BOM size found)
+TextEncoding FileIO_DetectEncodingEx(const BYTE* data, size_t size, size_t* bomSizeOut) {
     if (size >= 3 && memcmp(data, UTF8_BOM, 3) == 0) {
+        if (bomSizeOut) *bomSizeOut = 3;
         return ENCODING_UTF8;
     }
     if (size >= 2 && memcmp(data, UTF16LE_BOM, 2) == 0) {
+        if (bomSizeOut) *bomSizeOut = 2;
         return ENCODING_UTF16_LE;
     }
     if (size >= 2 && memcmp(data, UTF16BE_BOM, 2) == 0) {
+        if (bomSizeOut) *bomSizeOut = 2;
         return ENCODING_UTF16_BE;
     }
+
+    // No BOM found
+    if (bomSizeOut) *bomSizeOut = 0;
 
     // Check for UTF-8 validity (heuristic)
     BOOL isValidUtf8 = TRUE;
@@ -47,6 +53,11 @@ TextEncoding FileIO_DetectEncoding(const BYTE* data, size_t size) {
     }
 
     return isValidUtf8 ? ENCODING_UTF8 : ENCODING_ANSI;
+}
+
+// Legacy wrapper for compatibility
+TextEncoding FileIO_DetectEncoding(const BYTE* data, size_t size) {
+    return FileIO_DetectEncodingEx(data, size, NULL);
 }
 
 // Get BOM size for encoding
@@ -119,14 +130,14 @@ WCHAR* FileIO_ReadFile(const WCHAR* path, TextEncoding* detectedEncoding) {
     }
     CloseHandle(hFile);
 
-    // Detect encoding
-    TextEncoding encoding = FileIO_DetectEncoding(buffer, bytesRead);
+    // Detect encoding and actual BOM size
+    size_t bomSize = 0;
+    TextEncoding encoding = FileIO_DetectEncodingEx(buffer, bytesRead, &bomSize);
     if (detectedEncoding) {
         *detectedEncoding = encoding;
     }
 
     WCHAR* result = NULL;
-    size_t bomSize = FileIO_GetBOMSize(encoding);
 
     switch (encoding) {
         case ENCODING_UTF16_LE:
