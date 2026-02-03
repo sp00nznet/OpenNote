@@ -9,7 +9,6 @@ build:
   stage: build
   tags:
     - windows
-    - vs2022
   script:
     - cmake -B build -G "Visual Studio 17 2022" -A x64
     - cmake --build build --config Release
@@ -25,7 +24,6 @@ build:debug:
   stage: build
   tags:
     - windows
-    - vs2022
   script:
     - cmake -B build -G "Visual Studio 17 2022" -A x64
     - cmake --build build --config Debug
