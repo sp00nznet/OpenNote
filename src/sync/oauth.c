@@ -375,16 +375,21 @@ BOOL OAuth_GoogleLogin(HWND hParent, OAuthToken* tokenOut) {
     }
 
     // Build authorization URL
-    char authUrl[1024];
+    char authUrl[2048];
     snprintf(authUrl, sizeof(authUrl),
              "%s?client_id=%s&redirect_uri=http://localhost:%d/callback"
              "&response_type=code&scope=https://www.googleapis.com/auth/drive.file"
              "&access_type=offline&state=opennote",
              GOOGLE_AUTH_URL, GOOGLE_CLIENT_ID, OAUTH_CALLBACK_PORT);
 
+    // Debug: show auth URL
+    WCHAR debugUrl[2048];
+    MultiByteToWideChar(CP_UTF8, 0, authUrl, -1, debugUrl, 2048);
+    MessageBoxW(NULL, debugUrl, L"Google Auth URL (Debug)", MB_OK);
+
     // Open browser
-    WCHAR authUrlW[1024];
-    MultiByteToWideChar(CP_UTF8, 0, authUrl, -1, authUrlW, 1024);
+    WCHAR authUrlW[2048];
+    MultiByteToWideChar(CP_UTF8, 0, authUrl, -1, authUrlW, 2048);
     ShellExecuteW(NULL, L"open", authUrlW, NULL, NULL, SW_SHOWNORMAL);
 
     // Wait for callback (2 minute timeout)
