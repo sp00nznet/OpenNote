@@ -139,6 +139,9 @@ void TabControl_SetTabTitle(int index, const WCHAR* title) {
     };
 
     SendMessageW(g_app->hTabControl, TCM_SETITEMW, index, (LPARAM)&tci);
+
+    // Update new tab button position since tab width may have changed
+    MainWindow_UpdateNewTabButton();
 }
 
 // Get tab title

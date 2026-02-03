@@ -657,6 +657,9 @@ INT_PTR CALLBACK DefaultsProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
                 // Auto-save session checkbox
                 CheckDlgButton(hwnd, IDC_DEFAULTS_AUTOSAVE, g_app->autoSaveSession ? BST_CHECKED : BST_UNCHECKED);
+
+                // Auto-restore session checkbox
+                CheckDlgButton(hwnd, IDC_DEFAULTS_AUTORESTORE, g_app->autoRestoreSession ? BST_CHECKED : BST_UNCHECKED);
             }
             return TRUE;
 
@@ -721,6 +724,9 @@ INT_PTR CALLBACK DefaultsProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
                         // Get auto-save session setting
                         g_app->autoSaveSession = (IsDlgButtonChecked(hwnd, IDC_DEFAULTS_AUTOSAVE) == BST_CHECKED);
+
+                        // Get auto-restore session setting
+                        g_app->autoRestoreSession = (IsDlgButtonChecked(hwnd, IDC_DEFAULTS_AUTORESTORE) == BST_CHECKED);
 
                         EndDialog(hwnd, IDOK);
                     }

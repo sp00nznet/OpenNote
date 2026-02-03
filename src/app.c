@@ -15,6 +15,7 @@ BOOL App_Initialize(HINSTANCE hInstance) {
     g_app->showStatusBar = TRUE;
     g_app->alwaysOnTop = FALSE;
     g_app->autoSaveSession = FALSE;
+    g_app->autoRestoreSession = FALSE;
     g_app->tabSize = 4;
     g_app->zoomLevel = 100;
     g_app->wrapAround = TRUE;
@@ -62,8 +63,25 @@ BOOL App_Initialize(HINSTANCE hInstance) {
     // Load accelerators
     g_app->hAccel = LoadAcceleratorsW(hInstance, MAKEINTRESOURCEW(IDA_ACCEL));
 
-    // Create initial tab
-    App_CreateTab(L"Untitled");
+    // Auto-restore session or create initial tab
+    BOOL sessionRestored = FALSE;
+    if (g_app->autoRestoreSession && Database_IsOpen()) {
+        // Check if there's a saved session
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(Database_GetHandle(), "SELECT COUNT(*) FROM session_tabs", -1, &stmt, NULL) == SQLITE_OK) {
+            if (sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_int(stmt, 0) > 0) {
+                sqlite3_finalize(stmt);
+                App_RestoreSession();
+                sessionRestored = (g_app->tabCount > 0);
+            } else {
+                sqlite3_finalize(stmt);
+            }
+        }
+    }
+
+    if (!sessionRestored) {
+        App_CreateTab(L"Untitled");
+    }
 
     // Initialize spell checker (disabled for now - may cause issues)
     // Editor_InitSpellCheck();
@@ -178,6 +196,8 @@ void App_LoadSettings(void) {
                 g_app->alwaysOnTop = atoi(value);
             } else if (strcmp(key, "auto_save_on_exit") == 0) {
                 g_app->autoSaveSession = atoi(value);
+            } else if (strcmp(key, "auto_restore_session") == 0) {
+                g_app->autoRestoreSession = atoi(value);
             } else if (strcmp(key, "minimize_to_tray") == 0) {
                 g_app->minimizeToTray = atoi(value);
             } else if (strcmp(key, "tab_size") == 0) {
@@ -230,6 +250,9 @@ void App_SaveSettings(void) {
     Database_Execute(sql);
 
     snprintf(sql, sizeof(sql), "INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_save_on_exit', '%d')", g_app->autoSaveSession);
+    Database_Execute(sql);
+
+    snprintf(sql, sizeof(sql), "INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_restore_session', '%d')", g_app->autoRestoreSession);
     Database_Execute(sql);
 
     snprintf(sql, sizeof(sql), "INSERT OR REPLACE INTO settings (key, value) VALUES ('minimize_to_tray', '%d')", g_app->minimizeToTray);
@@ -514,8 +537,8 @@ void App_SaveSession(void) {
             WideCharToMultiByte(CP_UTF8, 0, doc->title, -1, titleUtf8, sizeof(titleUtf8), NULL, NULL);
             sqlite3_bind_text(stmt, 5, titleUtf8, -1, SQLITE_TRANSIENT);
 
-            // Content (for unsaved/new files)
-            if (tab->hEditor && (doc->isNew || doc->modified)) {
+            // Content - always save as backup in case file is deleted later
+            if (tab->hEditor) {
                 WCHAR* content = Editor_GetText(tab->hEditor);
                 if (content) {
                     int contentLen = (int)wcslen(content);
@@ -648,22 +671,27 @@ void App_RestoreSession(void) {
                 g_app->tabs[idx]->document = doc;
 
                 // Load content from file/note first
+                BOOL contentLoaded = FALSE;
                 if (doc->type == DOC_TYPE_NOTE || (doc->type == DOC_TYPE_FILE && doc->filePath[0])) {
-                    Document_Load(doc, g_app->tabs[idx]->hEditor);
+                    contentLoaded = Document_Load(doc, g_app->tabs[idx]->hEditor);
                 }
 
-                // Restore unsaved content if any
-                if (content && (doc->isNew || isModified)) {
-                    WCHAR* contentW = NULL;
+                // Restore saved content if:
+                // - Content wasn't loaded from file/note, OR
+                // - Document was modified (use the modified version)
+                if (content && content[0] && (!contentLoaded || isModified)) {
                     int len = MultiByteToWideChar(CP_UTF8, 0, content, -1, NULL, 0);
                     if (len > 0) {
-                        contentW = (WCHAR*)malloc(len * sizeof(WCHAR));
+                        WCHAR* contentW = (WCHAR*)malloc(len * sizeof(WCHAR));
                         if (contentW) {
                             MultiByteToWideChar(CP_UTF8, 0, content, -1, contentW, len);
                             Editor_SetText(g_app->tabs[idx]->hEditor, contentW);
                             free(contentW);
                         }
                     }
+                } else if (!contentLoaded && (!content || !content[0])) {
+                    // No content available - set empty text to avoid garbage
+                    Editor_SetText(g_app->tabs[idx]->hEditor, L"");
                 }
 
                 doc->modified = isModified;
