@@ -49,6 +49,7 @@ set(SUPERNOTE_SOURCES
     src/db/database.c
     src/db/notes_repo.c
     src/db/links_repo.c
+    src/sync/oauth.c
 )
 
 # Resource file
@@ -86,6 +87,8 @@ target_link_libraries(OpenNote PRIVATE
     uuid
     msimg32
     shcore
+    winhttp
+    ws2_32
 )
 
 target_compile_definitions(OpenNote PRIVATE
