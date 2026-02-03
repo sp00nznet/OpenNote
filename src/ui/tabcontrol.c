@@ -7,6 +7,7 @@ static WNDPROC g_origTabProc = NULL;
 static DWORD g_lastClickTime = 0;
 static POINT g_lastClickPos = {0, 0};
 static BOOL g_inContextMenu = FALSE;  // Guard against re-entrant context menus
+static DWORD g_lastMenuCloseTime = 0; // Time when last context menu closed
 
 // Subclass procedure for tab control
 static LRESULT CALLBACK TabSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -205,12 +206,17 @@ static void TabControl_ShowEmptyAreaMenu(int x, int y) {
 
     DestroyMenu(hMenu);
     g_inContextMenu = FALSE;
+    g_lastMenuCloseTime = GetTickCount();
 }
 
 // Handle right-click on tab
 void TabControl_OnRightClick(int x, int y) {
     if (!g_app->hTabControl) return;
     if (g_inContextMenu) return;  // Prevent re-entrant calls
+
+    // Prevent context menu from appearing too soon after one just closed
+    DWORD now = GetTickCount();
+    if (now - g_lastMenuCloseTime < 200) return;
 
     // Find which tab was clicked
     POINT pt = { x, y };
@@ -315,4 +321,5 @@ void TabControl_ShowContextMenu(int tabIndex, int x, int y) {
 
     DestroyMenu(hMenu);
     g_inContextMenu = FALSE;
+    g_lastMenuCloseTime = GetTickCount();
 }
