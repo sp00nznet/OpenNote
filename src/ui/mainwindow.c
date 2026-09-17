@@ -1,6 +1,10 @@
 #include "supernote.h"
 #include "res/resource.h"
 #include <windowsx.h>
+// ponytail: still here for the SCNotification dispatch below -- that is the
+// control's notification protocol, not an editing operation. Every editing
+// operation now goes through the Editor_* API. When the second document view
+// lands in v0.5 this dispatch is the only part that needs a branch.
 #include <Scintilla.h>
 #include <shellapi.h>
 
@@ -412,11 +416,8 @@ static void OnNotify(HWND hwnd, int idCtrl, LPNMHDR pnmh) {
 
             case SCN_INDICATORCLICK:
                 // Check if click was on link indicator (indicator 8)
-                {
-                    int indicators = (int)SendMessage(tab->hEditor, SCI_INDICATORALLONFOR, scn->position, 0);
-                    if (indicators & (1 << 8)) {  // INDICATOR_LINK = 8
-                        HandleLinkClick(scn->position);
-                    }
+                if (Editor_HasIndicatorAt(tab->hEditor, scn->position, EDITOR_INDICATOR_LINK)) {
+                    HandleLinkClick(scn->position);
                 }
                 break;
         }
@@ -939,65 +940,6 @@ void MainWindow_UpdateMenuState(void) {
     // Menu state is updated in WM_INITMENUPOPUP handlers in menubar.c
 }
 
-// Get word at position for spell check
-static WCHAR* GetWordAtPosition(HWND hEditor, int pos, int* wordStart, int* wordEnd) {
-    int lineNum = (int)SendMessage(hEditor, SCI_LINEFROMPOSITION, pos, 0);
-    int lineStart = (int)SendMessage(hEditor, SCI_POSITIONFROMLINE, lineNum, 0);
-    int lineEnd = (int)SendMessage(hEditor, SCI_GETLINEENDPOSITION, lineNum, 0);
-
-    // Get line text
-    int lineLen = lineEnd - lineStart;
-    if (lineLen <= 0) return NULL;
-
-    char* lineUtf8 = (char*)malloc(lineLen + 1);
-    if (!lineUtf8) return NULL;
-
-    struct Sci_TextRange tr;
-    tr.chrg.cpMin = lineStart;
-    tr.chrg.cpMax = lineEnd;
-    tr.lpstrText = lineUtf8;
-    SendMessage(hEditor, SCI_GETTEXTRANGE, 0, (LPARAM)&tr);
-
-    // Find word boundaries
-    int relPos = pos - lineStart;
-    int wStart = relPos;
-    int wEnd = relPos;
-
-    // Find start of word
-    while (wStart > 0 && (isalnum((unsigned char)lineUtf8[wStart - 1]) || lineUtf8[wStart - 1] == '\'')) {
-        wStart--;
-    }
-
-    // Find end of word
-    while (wEnd < lineLen && (isalnum((unsigned char)lineUtf8[wEnd]) || lineUtf8[wEnd] == '\'')) {
-        wEnd++;
-    }
-
-    if (wStart >= wEnd) {
-        free(lineUtf8);
-        return NULL;
-    }
-
-    // Extract word
-    char wordUtf8[256];
-    int wordLen = wEnd - wStart;
-    if (wordLen >= sizeof(wordUtf8)) wordLen = sizeof(wordUtf8) - 1;
-    memcpy(wordUtf8, lineUtf8 + wStart, wordLen);
-    wordUtf8[wordLen] = '\0';
-
-    free(lineUtf8);
-
-    *wordStart = lineStart + wStart;
-    *wordEnd = lineStart + wEnd;
-
-    // Convert to wide
-    int wideLen = MultiByteToWideChar(CP_UTF8, 0, wordUtf8, -1, NULL, 0);
-    WCHAR* word = (WCHAR*)malloc(wideLen * sizeof(WCHAR));
-    if (word) {
-        MultiByteToWideChar(CP_UTF8, 0, wordUtf8, -1, word, wideLen);
-    }
-    return word;
-}
 
 // Show editor context menu
 void MainWindow_ShowEditorContextMenu(HWND hwnd, int x, int y) {
@@ -1018,8 +960,7 @@ void MainWindow_ShowEditorContextMenu(HWND hwnd, int x, int y) {
     int clickPos = Editor_GetPositionFromPoint(hEditor, x, y);
 
     // Check if there's a spell error at this position (indicator 9)
-    int indicators = (int)SendMessage(hEditor, SCI_INDICATORALLONFOR, clickPos, 0);
-    BOOL hasSpellError = (indicators & (1 << 9)) != 0;  // INDICATOR_SPELL = 9
+    BOOL hasSpellError = Editor_HasIndicatorAt(hEditor, clickPos, EDITOR_INDICATOR_SPELL);
 
     // Spell suggestions at top if there's an error
     WCHAR* misspelledWord = NULL;
@@ -1028,7 +969,7 @@ void MainWindow_ShowEditorContextMenu(HWND hwnd, int x, int y) {
     int spellWordStart = 0, spellWordEnd = 0;
 
     if (hasSpellError) {
-        misspelledWord = GetWordAtPosition(hEditor, clickPos, &spellWordStart, &spellWordEnd);
+        misspelledWord = Editor_GetWordAt(hEditor, clickPos, &spellWordStart, &spellWordEnd);
         if (misspelledWord) {
             suggestions = Editor_GetSpellSuggestions(misspelledWord, &suggestionCount);
 
@@ -1106,12 +1047,7 @@ void MainWindow_ShowEditorContextMenu(HWND hwnd, int x, int y) {
             int suggIdx = cmd - IDM_SPELL_SUGGESTION_BASE;
             if (suggIdx < suggestionCount && suggestions[suggIdx]) {
                 // Replace the misspelled word with suggestion
-                SendMessage(hEditor, SCI_SETTARGETSTART, spellWordStart, 0);
-                SendMessage(hEditor, SCI_SETTARGETEND, spellWordEnd, 0);
-
-                char suggUtf8[256];
-                WideCharToMultiByte(CP_UTF8, 0, suggestions[suggIdx], -1, suggUtf8, sizeof(suggUtf8), NULL, NULL);
-                SendMessage(hEditor, SCI_REPLACETARGET, -1, (LPARAM)suggUtf8);
+                Editor_ReplaceRange(hEditor, spellWordStart, spellWordEnd, suggestions[suggIdx]);
 
                 // Re-check spelling
                 Editor_CheckSpelling(hEditor);
@@ -1127,8 +1063,7 @@ void MainWindow_ShowEditorContextMenu(HWND hwnd, int x, int y) {
         // Handle ignore
         else if (cmd == IDM_SPELL_IGNORE) {
             // Clear indicator for this word only
-            SendMessage(hEditor, SCI_SETINDICATORCURRENT, 9, 0);  // INDICATOR_SPELL
-            SendMessage(hEditor, SCI_INDICATORCLEARRANGE, spellWordStart, spellWordEnd - spellWordStart);
+            Editor_ClearSpellIndicatorRange(hEditor, spellWordStart, spellWordEnd);
         }
         // Handle spell check document
         else if (cmd == IDM_SPELL_CHECK_DOC) {

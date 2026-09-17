@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   project, entered in Settings. Google issues no credential that a public client can
   safely ship, so the alternative was shipping one anyway.
 
+### Changed
+- Every editing operation now goes through the `Editor_*` API. `mainwindow.c` no longer
+  sends Scintilla messages directly; `Editor_HasIndicatorAt`, `Editor_ReplaceRange`,
+  `Editor_ClearSpellIndicatorRange` and `Editor_GetWordAt` cover what it was reaching for.
+  The only Scintilla-specific code left outside `editor.c` is the notification dispatch.
+
 ### Fixed
 - Startup no longer fails when `Msftedit.dll` is unavailable. The RichEdit control has
   been unused since the Scintilla port; the library was still being loaded, and a load

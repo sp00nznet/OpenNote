@@ -28,12 +28,19 @@ features.
 - [x] GitHub device flow and Google PKCE — no client secret in the shipped binary
 - [x] DPAPI for token storage; bound parameters on all settings access
 - [ ] Rename the repository to `opennote`
-- [ ] Make the document and tab abstractions independent of Scintilla
+- [x] Route every editing operation through the `Editor_*` API (the Scintilla
+      coupling turned out to be far thinner than feared — see below)
 
-That last item is the one that matters later. Everything in `mainwindow.c`,
-`tabcontrol.c` and `editor.c` currently assumes a Scintilla control. A rich-text document
-cannot live in a Scintilla control, so that assumption has to come out before v0.5 — and
-it is roughly a day's work now against a rewrite of ~3,200 lines later.
+On that last item: the coupling was much thinner than a first look suggested. Scintilla
+was never spread across `mainwindow.c`, `tabcontrol.c` and `editor.c` — it was 282 uses
+inside `editor.c` and eleven leaks in `mainwindow.c`, with everything else already talking
+through `Editor_*(HWND, ...)`, which is view-agnostic as it stands. The eleven leaks are
+now closed, so the only Scintilla-specific code left outside `editor.c` is the
+`SCNotification` dispatch — the control's notification protocol rather than an editing
+operation, and the single place that needs a branch when a second view lands.
+
+No dispatch layer has been built, deliberately. There is one view type; a factory for one
+product is scaffolding. The seam is where it needs to be and the rest waits for v0.5.
 
 ## v0.3.0 — Notes vault
 

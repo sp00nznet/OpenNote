@@ -1596,3 +1596,107 @@ BOOL Editor_AddWordToDictionary(const WCHAR* word) {
     HRESULT hr = g_spellChecker->lpVtbl->Add(g_spellChecker, word);
     return SUCCEEDED(hr);
 }
+
+// ---------------------------------------------------------------------------
+// Operations that callers outside this file used to reach for by sending
+// Scintilla messages directly. They are here so that mainwindow.c does not
+// need to know which control is behind the HWND -- see ROADMAP.md v0.5, where
+// a second document view arrives and this is the seam it slots into.
+// ---------------------------------------------------------------------------
+
+static int IndicatorNumber(EditorIndicator which) {
+    return (which == EDITOR_INDICATOR_LINK) ? INDICATOR_LINK : INDICATOR_SPELL;
+}
+
+BOOL Editor_HasIndicatorAt(HWND hEditor, int pos, EditorIndicator which) {
+    if (!hEditor) return FALSE;
+
+    int indicators = (int)SciCall(hEditor, SCI_INDICATORALLONFOR, pos, 0);
+    return (indicators & (1 << IndicatorNumber(which))) != 0;
+}
+
+void Editor_ReplaceRange(HWND hEditor, int start, int end, const WCHAR* text) {
+    if (!hEditor || !text || start > end) return;
+
+    int utf8Len = WideCharToMultiByte(CP_UTF8, 0, text, -1, NULL, 0, NULL, NULL);
+    if (utf8Len <= 0) return;
+
+    char* utf8 = (char*)malloc(utf8Len);
+    if (!utf8) return;
+    WideCharToMultiByte(CP_UTF8, 0, text, -1, utf8, utf8Len, NULL, NULL);
+
+    SciCall(hEditor, SCI_SETTARGETSTART, start, 0);
+    SciCall(hEditor, SCI_SETTARGETEND, end, 0);
+    SciCall(hEditor, SCI_REPLACETARGET, -1, utf8);
+
+    free(utf8);
+}
+
+void Editor_ClearSpellIndicatorRange(HWND hEditor, int start, int end) {
+    if (!hEditor || start >= end) return;
+
+    SciCall(hEditor, SCI_SETINDICATORCURRENT, INDICATOR_SPELL, 0);
+    SciCall(hEditor, SCI_INDICATORCLEARRANGE, start, end - start);
+}
+
+// Word under a position, for the spell-check context menu. Positions are byte
+// offsets into the UTF-8 document, which is why the scan happens on the UTF-8
+// line rather than after converting to wide characters.
+WCHAR* Editor_GetWordAt(HWND hEditor, int pos, int* wordStart, int* wordEnd) {
+    if (!hEditor || !wordStart || !wordEnd) return NULL;
+
+    int lineNum   = (int)SciCall(hEditor, SCI_LINEFROMPOSITION, pos, 0);
+    int lineStart = (int)SciCall(hEditor, SCI_POSITIONFROMLINE, lineNum, 0);
+    int lineEnd   = (int)SciCall(hEditor, SCI_GETLINEENDPOSITION, lineNum, 0);
+
+    int lineLen = lineEnd - lineStart;
+    if (lineLen <= 0) return NULL;
+
+    char* lineUtf8 = (char*)malloc((size_t)lineLen + 1);
+    if (!lineUtf8) return NULL;
+
+    struct Sci_TextRange tr;
+    tr.chrg.cpMin = lineStart;
+    tr.chrg.cpMax = lineEnd;
+    tr.lpstrText = lineUtf8;
+    SciCall(hEditor, SCI_GETTEXTRANGE, 0, &tr);
+
+    int relPos = pos - lineStart;
+    if (relPos < 0) relPos = 0;
+    if (relPos > lineLen) relPos = lineLen;
+
+    int wStart = relPos;
+    int wEnd = relPos;
+
+    while (wStart > 0 &&
+           (isalnum((unsigned char)lineUtf8[wStart - 1]) || lineUtf8[wStart - 1] == '\'')) {
+        wStart--;
+    }
+    while (wEnd < lineLen &&
+           (isalnum((unsigned char)lineUtf8[wEnd]) || lineUtf8[wEnd] == '\'')) {
+        wEnd++;
+    }
+
+    if (wStart >= wEnd) {
+        free(lineUtf8);
+        return NULL;
+    }
+
+    char wordUtf8[256];
+    size_t wordLen = (size_t)(wEnd - wStart);
+    if (wordLen >= sizeof(wordUtf8)) wordLen = sizeof(wordUtf8) - 1;
+    memcpy(wordUtf8, lineUtf8 + wStart, wordLen);
+    wordUtf8[wordLen] = '\0';
+
+    free(lineUtf8);
+
+    *wordStart = lineStart + wStart;
+    *wordEnd = lineStart + wEnd;
+
+    int wideLen = MultiByteToWideChar(CP_UTF8, 0, wordUtf8, -1, NULL, 0);
+    WCHAR* word = (WCHAR*)malloc((size_t)wideLen * sizeof(WCHAR));
+    if (word) {
+        MultiByteToWideChar(CP_UTF8, 0, wordUtf8, -1, word, wideLen);
+    }
+    return word;
+}

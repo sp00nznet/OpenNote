@@ -58,6 +58,18 @@ int Editor_GetThemeCount(void);
 const WCHAR* Editor_GetThemeName(int index);
 void Editor_ApplyTheme(HWND hEditor, const WCHAR* filename);
 
+// Indicator kinds, named so callers do not need the underlying control's
+// numbering.
+typedef enum {
+    EDITOR_INDICATOR_LINK,
+    EDITOR_INDICATOR_SPELL
+} EditorIndicator;
+
+BOOL Editor_HasIndicatorAt(HWND hEditor, int pos, EditorIndicator which);
+void Editor_ReplaceRange(HWND hEditor, int start, int end, const WCHAR* text);
+void Editor_ClearSpellIndicatorRange(HWND hEditor, int start, int end);
+WCHAR* Editor_GetWordAt(HWND hEditor, int pos, int* wordStart, int* wordEnd);  // Caller must free
+
 // Link indicators
 void Editor_SetupLinkIndicator(HWND hEditor);
 void Editor_AddLinkIndicator(HWND hEditor, int start, int end);
