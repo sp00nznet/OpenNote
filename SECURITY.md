@@ -14,45 +14,49 @@ reporting** on the repository's Security tab instead.
 
 There is no bounty. Expect a reply within a week.
 
-## Known issues, and what is being done about them
+## Fixed in v0.2.0
 
-These are real, they are in the shipped code today, and they are the reason v0.2.0 exists.
+Three problems were present in earlier code. All three are fixed; they are described here
+rather than quietly deleted, because anyone running a build from before v0.2.0 is still
+affected by them.
 
-### 1. OAuth client secrets are compiled into the executable
+### 1. OAuth client secrets were compiled into the executable — fixed
 
-`CMakeLists.txt` accepts `GH_OAUTH_CLIENT_SECRET` and `GOOGLE_CLIENT_SECRET` and bakes
+`CMakeLists.txt` accepted `GH_OAUTH_CLIENT_SECRET` and `GOOGLE_CLIENT_SECRET` and baked
 them into the binary as preprocessor defines. A secret inside a program distributed to
 users is not a secret — `strings OpenNote.exe` recovers it.
 
-**Fix in progress:** GitHub's [device authorization flow][device], which is designed for
-clients that cannot hold a secret, and [PKCE][pkce] for Google. Neither needs a client
-secret, which also means CI needs no credentials and anyone can reproduce the exact
-binary that is published.
+GitHub now uses the [device authorization grant][device] (RFC 8628), which needs only a
+client ID — public by design. Google uses [PKCE][pkce] (RFC 7636); Google's token endpoint
+still wants a `client_secret` for a Desktop client, so that value is supplied by the user
+for their own Google Cloud project and stored encrypted. It never ships.
 
-**Until then:** a build made without those CMake variables has no secret in it and simply
-does not offer cloud sync. That is the recommended way to build from source.
+`CMakeLists.txt` now fails the build if either secret variable is passed at all, so this
+cannot come back by accident. Because no secret is needed, **CI uses no credentials**, and
+anyone can reproduce a published binary from its tagged commit.
 
-### 2. Access tokens are stored in cleartext
+### 2. Access tokens were stored in cleartext — fixed
 
-`OAuth_SaveToken` writes the token into the `settings` table as plain text. Anything that
-can read `%APPDATA%\OpenNote\opennote.db` — any process running as you, any backup, any
-sync tool that happens to pick that directory up — can read the token and use it against
-your GitHub or Google account.
+`OAuth_SaveToken` wrote the token into the `settings` table as plain text. Anything that
+could read `%APPDATA%\OpenNote\opennote.db` — any process running as you, any backup, any
+sync tool that picked that directory up — could read the token and use it against your
+account.
 
-**Fix in progress:** `CryptProtectData` (DPAPI), which ties the stored blob to your
-Windows account.
+Tokens are now wrapped with `CryptProtectData` (DPAPI) before they reach the database,
+which ties the stored blob to your Windows account. A copy of `opennote.db` taken to
+another machine, or opened by another user, yields nothing.
 
-**Until then:** treat a connected account as a credential stored on disk. Revoking it is
-one click in your provider's settings, and worth doing if the machine is shared.
+**If you connected an account before v0.2.0**, the old cleartext value was written to
+disk. Revoke that token in your provider's settings and reconnect.
 
-### 3. The token write path builds SQL by string formatting
+### 3. The token write path built SQL by string formatting — fixed
 
-The same function formats the token directly into an `INSERT OR REPLACE` statement rather
-than binding it as a parameter. The value is one OpenNote itself received from the
-provider, so this is not currently a path an attacker controls — but it is the wrong
-construction and it is being replaced with a bound parameter.
+The same function formatted the token directly into an `INSERT OR REPLACE` statement
+rather than binding it. The value came from the provider rather than from an attacker, so
+it was not a live injection path — but it was the wrong construction. Settings access now
+goes through `Database_SetSetting` / `Database_GetSetting`, which bind their parameters.
 
-### 4. Notes are not encrypted at rest
+### Still true: notes are not encrypted at rest
 
 The notes database is an ordinary SQLite file. Anyone with the file has the notes.
 
@@ -66,6 +70,14 @@ otherwise. Encryption at rest is scheduled for v0.3.0 — see `ROADMAP.md`.
 - No account. There is nothing to sign up for.
 - Sync talks to GitHub or Google directly. There is no server in between, and none is
   operated by this project.
+
+## Self-check
+
+`OpenNote.exe --selftest` runs the checks that guard these paths — the PKCE S256 challenge
+against the RFC 7636 appendix B test vector, the DPAPI round trip including its truncation
+and malformed-input cases, and the JSON field reader against the responses GitHub's device
+endpoint actually returns. It prints a line per check and exits non-zero on any failure.
+CI runs it on every build.
 
 ## Verifying what you run
 

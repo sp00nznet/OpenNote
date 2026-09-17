@@ -42,6 +42,13 @@ jobs:
 
       # The tag drives the installer's version so it cannot drift from what shipped.
       # Untagged builds are 0.0.0 rather than a number that looks like a release.
+      # Guards the crypto and OAuth parsing paths: the PKCE S256 challenge
+      # against the RFC 7636 test vector, the DPAPI round trip, and the JSON
+      # field reader against the shapes GitHub's device endpoint returns.
+      # Non-zero exit fails the build.
+      - name: Self-test
+        run: .\build\bin\OpenNote.exe --selftest
+
       - name: Derive version
         id: ver
         shell: pwsh

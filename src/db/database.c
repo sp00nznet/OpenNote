@@ -246,3 +246,71 @@ const char* Database_GetLastError(void) {
     }
     return g_lastError[0] ? g_lastError : "Unknown error";
 }
+
+// ---------------------------------------------------------------------------
+// Settings key/value access
+//
+// Bound parameters, not formatted SQL. Every caller here handles values that
+// came from somewhere else -- an OAuth provider, a file, a dialog -- and a
+// quote in any of them would otherwise change the statement.
+// ---------------------------------------------------------------------------
+
+BOOL Database_SetSetting(const char* key, const char* value) {
+    if (!g_db || !key || !value) return FALSE;
+
+    sqlite3_stmt* stmt = NULL;
+    if (sqlite3_prepare_v2(g_db,
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+            -1, &stmt, NULL) != SQLITE_OK) {
+        return FALSE;
+    }
+
+    sqlite3_bind_text(stmt, 1, key, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, value, -1, SQLITE_TRANSIENT);
+
+    BOOL ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
+BOOL Database_GetSetting(const char* key, char* valueOut, size_t valueSize) {
+    if (!g_db || !key || !valueOut || valueSize == 0) return FALSE;
+
+    valueOut[0] = '\0';
+
+    sqlite3_stmt* stmt = NULL;
+    if (sqlite3_prepare_v2(g_db,
+            "SELECT value FROM settings WHERE key = ?",
+            -1, &stmt, NULL) != SQLITE_OK) {
+        return FALSE;
+    }
+
+    sqlite3_bind_text(stmt, 1, key, -1, SQLITE_TRANSIENT);
+
+    BOOL found = FALSE;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char* value = (const char*)sqlite3_column_text(stmt, 0);
+        if (value && value[0]) {
+            strncpy_s(valueOut, valueSize, value, _TRUNCATE);
+            found = TRUE;
+        }
+    }
+
+    sqlite3_finalize(stmt);
+    return found;
+}
+
+BOOL Database_DeleteSetting(const char* key) {
+    if (!g_db || !key) return FALSE;
+
+    sqlite3_stmt* stmt = NULL;
+    if (sqlite3_prepare_v2(g_db,
+            "DELETE FROM settings WHERE key = ?", -1, &stmt, NULL) != SQLITE_OK) {
+        return FALSE;
+    }
+
+    sqlite3_bind_text(stmt, 1, key, -1, SQLITE_TRANSIENT);
+    BOOL ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return ok;
+}

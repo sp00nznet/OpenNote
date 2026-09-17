@@ -1,11 +1,58 @@
 #include "supernote.h"
 #include "res/resource.h"
+#include "sync/crypto.h"
+#include "sync/oauth.h"
 
 // Global application state
 AppState* g_app = NULL;
 
+// --selftest: run the checks that guard the crypto and parsing paths, print the
+// result and exit. This is a /SUBSYSTEM:WINDOWS binary with no console of its
+// own, so borrow the caller's when there is one; CI reads the exit code either
+// way. 0 means every check held.
+static int RunSelfTest(void) {
+    // Only borrow a console when there is genuinely nowhere to write. If the
+    // caller already redirected stdout -- a pipe, a file, a CI log -- then
+    // reopening it on CONOUT$ would throw that output away.
+    BOOL attached = FALSE;
+    FILE* out = NULL;
+    if (GetStdHandle(STD_OUTPUT_HANDLE) == NULL) {
+        attached = AttachConsole(ATTACH_PARENT_PROCESS);
+        if (attached) freopen_s(&out, "CONOUT$", "w", stdout);
+    }
+
+    struct {
+        const char* name;
+        BOOL (*run)(char*, size_t);
+    } checks[] = {
+        { "crypto", Crypto_SelfTest },
+        { "oauth",  OAuth_SelfTest  },
+    };
+
+    int failed = 0;
+    for (size_t i = 0; i < ARRAYSIZE(checks); i++) {
+        char failure[256] = {0};
+        if (checks[i].run(failure, sizeof(failure))) {
+            printf("ok    %s\n", checks[i].name);
+        } else {
+            printf("FAIL  %s: %s\n", checks[i].name, failure);
+            failed++;
+        }
+    }
+
+    printf("%s\n", failed ? "SELFTEST FAILED" : "selftest passed");
+    fflush(stdout);
+    if (attached) FreeConsole();
+
+    return failed ? 1 : 0;
+}
+
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {
     (void)hPrevInstance;
+
+    if (lpCmdLine && wcsstr(lpCmdLine, L"--selftest")) {
+        return RunSelfTest();
+    }
 
     // Initialize common controls
     INITCOMMONCONTROLSEX icex = {

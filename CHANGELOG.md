@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Installer is per-user by default and no longer requires administrator rights; an
   all-users install is still available from the elevation prompt.
 - Installer version is supplied by the build rather than hardcoded.
+- Google Drive sync now needs a client ID and secret from the user's own Google Cloud
+  project, entered in Settings. Google issues no credential that a public client can
+  safely ship, so the alternative was shipping one anyway.
 
 ### Fixed
 - Startup no longer fails when `Msftedit.dll` is unavailable. The RichEdit control has
@@ -34,6 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in its deploy stage.
 
 ### Security
-- See `SECURITY.md` for the known issues being addressed in v0.2.0: OAuth client secrets
-  embedded in the shipped binary, cleartext token storage, and unparameterised SQL on the
-  token write path.
+- **OAuth client secrets are no longer compiled into the binary.** GitHub now uses the
+  device authorization grant (RFC 8628), which needs only a public client ID. Google uses
+  PKCE (RFC 7636) with the user's own Google Cloud credentials, stored encrypted. The
+  build now fails outright if `GH_OAUTH_CLIENT_SECRET` or `GOOGLE_CLIENT_SECRET` is
+  passed, so it cannot regress. CI consequently needs no secrets, and a published binary
+  is reproducible from its tagged commit.
+- **Access tokens are wrapped with DPAPI** (`CryptProtectData`) before reaching the
+  database, tying them to the Windows account. Anyone who connected an account before
+  v0.2.0 should revoke that token and reconnect — the old value was written in cleartext.
+- **Settings access binds its parameters.** `Database_SetSetting` / `Database_GetSetting`
+  replace the formatted `INSERT OR REPLACE` the token path used.
+- `OpenNote.exe --selftest` checks the PKCE S256 challenge against the RFC 7636 test
+  vector, the DPAPI round trip, and the JSON field reader. CI runs it on every build.

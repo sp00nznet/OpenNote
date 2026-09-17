@@ -25,8 +25,8 @@ features.
       held unpublished until v0.5.0
 - [x] Remove personal-host references from the README and the installer
 - [x] Remove the dead `Msftedit.dll` load that could abort startup for nothing
-- [ ] GitHub device flow and Google PKCE — no client secret in the shipped binary
-- [ ] DPAPI for token storage; bound parameter on the token write
+- [x] GitHub device flow and Google PKCE — no client secret in the shipped binary
+- [x] DPAPI for token storage; bound parameters on all settings access
 - [ ] Rename the repository to `opennote`
 - [ ] Make the document and tab abstractions independent of Scintilla
 

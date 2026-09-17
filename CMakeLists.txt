@@ -50,6 +50,7 @@ set(SUPERNOTE_SOURCES
     src/db/notes_repo.c
     src/db/links_repo.c
     src/sync/oauth.c
+    src/sync/crypto.c
     src/sync/github_sync.c
     src/sync/google_sync.c
 )
@@ -91,6 +92,8 @@ target_link_libraries(OpenNote PRIVATE
     shcore
     winhttp
     ws2_32
+    crypt32
+    bcrypt
 )
 
 target_compile_definitions(OpenNote PRIVATE
@@ -100,18 +103,27 @@ target_compile_definitions(OpenNote PRIVATE
     WIN32_LEAN_AND_MEAN
 )
 
-# OAuth credentials (optional - passed from CI/CD)
+# OAuth client IDs (optional).
+#
+# Client IDs only. A client *secret* is deliberately not accepted here: a secret
+# compiled into a binary handed to users is not a secret, and OpenNote no longer
+# needs one -- GitHub uses the device flow and Google uses PKCE with the user's
+# own credentials. See SECURITY.md.
+#
+# Leaving both unset produces a build with no credentials in it at all; the user
+# supplies a client ID in Settings if they want sync.
 if(GH_OAUTH_CLIENT_ID)
     target_compile_definitions(OpenNote PRIVATE GITHUB_CLIENT_ID="${GH_OAUTH_CLIENT_ID}")
-endif()
-if(GH_OAUTH_CLIENT_SECRET)
-    target_compile_definitions(OpenNote PRIVATE GITHUB_CLIENT_SECRET="${GH_OAUTH_CLIENT_SECRET}")
 endif()
 if(GOOGLE_CLIENT_ID)
     target_compile_definitions(OpenNote PRIVATE GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}")
 endif()
-if(GOOGLE_CLIENT_SECRET)
-    target_compile_definitions(OpenNote PRIVATE GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}")
+
+if(GH_OAUTH_CLIENT_SECRET OR GOOGLE_CLIENT_SECRET)
+    message(FATAL_ERROR
+        "GH_OAUTH_CLIENT_SECRET and GOOGLE_CLIENT_SECRET are no longer accepted. "
+        "A client secret shipped inside the binary is recoverable with `strings`. "
+        "See SECURITY.md.")
 endif()
 
 # Enable warnings

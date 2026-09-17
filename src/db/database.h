@@ -19,6 +19,11 @@ BOOL Database_BeginTransaction(void);
 BOOL Database_CommitTransaction(void);
 BOOL Database_RollbackTransaction(void);
 
+// Settings key/value access. Bound parameters -- see database.c.
+BOOL Database_SetSetting(const char* key, const char* value);
+BOOL Database_GetSetting(const char* key, char* valueOut, size_t valueSize);
+BOOL Database_DeleteSetting(const char* key);
+
 // Error handling
 const char* Database_GetLastError(void);
 

@@ -27,4 +27,8 @@ BOOL OAuth_SaveToken(const char* provider, const OAuthToken* token);
 BOOL OAuth_LoadToken(const char* provider, OAuthToken* token);
 void OAuth_DeleteToken(const char* provider);
 
+// Self-check, run by `OpenNote.exe --selftest`. Returns FALSE and fills
+// `failure` with the first check that did not hold.
+BOOL OAuth_SelfTest(char* failure, size_t failureSize);
+
 #endif // OAUTH_H
