@@ -32,7 +32,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # No -G: the generator is whatever Visual Studio the runner image ships.
       # Pinning "Visual Studio 17 2022" broke the moment windows-latest rolled
@@ -81,7 +81,7 @@ jobs:
           Copy-Item build\bin\OpenNote.exe dist\
           Copy-Item build\installer\OpenNoteSetup.exe dist\
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: opennote-windows-x64
           path: dist/
