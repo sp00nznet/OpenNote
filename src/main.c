@@ -14,17 +14,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     };
     InitCommonControlsEx(&icex);
 
-    // Load RichEdit library
-    HMODULE hRichEdit = LoadLibraryW(L"Msftedit.dll");
-    if (!hRichEdit) {
-        MessageBoxW(NULL, L"Failed to load RichEdit library", APP_NAME, MB_ICONERROR);
-        return 1;
-    }
+    // ponytail: no Msftedit.dll load here. The RichEdit control has been unused since
+    // the Scintilla port, but the library was still being loaded on startup and a load
+    // failure aborted the application for nothing. It comes back deliberately in v0.5
+    // when the rich text document type needs it -- see ROADMAP.md.
 
     // Initialize application
     if (!App_Initialize(hInstance)) {
         MessageBoxW(NULL, L"Failed to initialize application", APP_NAME, MB_ICONERROR);
-        FreeLibrary(hRichEdit);
         return 1;
     }
 
@@ -66,7 +63,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
     // Cleanup
     App_Shutdown();
-    FreeLibrary(hRichEdit);
 
     return result ? 0 : 1;
 }

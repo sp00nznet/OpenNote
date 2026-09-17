@@ -11,16 +11,53 @@
         |_|
 ```
 
-[![Build Status](https://github.com/sp00nz/OpenNote/badges/main/pipeline.svg)](https://github.com/sp00nz/OpenNote/-/pipelines)
-[![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)](https://github.com/sp00nznet/OpenNote)
+[![Build](https://github.com/sp00nznet/opennote/actions/workflows/ci.yml/badge.svg)](https://github.com/sp00nznet/opennote/actions/workflows/ci.yml)
+[![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)](https://github.com/sp00nznet/opennote)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![C](https://img.shields.io/badge/language-C-orange.svg)](https://en.wikipedia.org/wiki/C_(programming_language))
 
-> A modern, lightweight tabbed text editor for Windows with SQLite-based note storage. Built as a Notepad replacement with enhanced features for power users.
+A tabbed Windows editor with a local SQLite note store behind it. Native C and Win32 —
+one executable, a few megabytes, no runtime to install and nothing running when it is
+closed.
 
-## Download
+Sibling project to [futureburn](https://github.com/sp00nznet/futureburn),
+[pstfree](https://github.com/sp00nznet/pstfree),
+[vncfree](https://github.com/sp00nznet/vncfree) and
+[bulkhead](https://github.com/sp00nznet/bulkhead) — same attitude: find the Windows
+payware, read the published spec it is hiding behind, give it away.
 
-**[Download Latest Release](https://github.com/sp00nznet/releases/OpenNote/)**
+## Status
+
+**v0.2.0-dev — alpha.** Usable daily, not yet released. There are no downloads on the
+releases page and there will not be until the milestone below is reached; until then,
+build it, which takes one command.
+
+Three security issues are known and documented in [SECURITY.md](SECURITY.md). A build
+made from source without the optional OAuth variables is not affected by any of them.
+
+### Where this is going
+
+**Windows shipped a rich text editor for thirty years and removed it.** WordPad is gone
+from Windows 11 24H2 and Windows Server 2025. Microsoft's suggested replacement is a
+subscription: Microsoft 365 is $70–100/yr, or $150 once for Office 2024.
+
+The first real milestone here is a WordPad replacement — RTF, formatting, tables, spell
+check, print — and the stretch is the part Word actually gets paid for: `.docx`, proper
+page layout, `.doc`, track changes. Everything needed for that is already in Windows and
+already paid for. DirectWrite does the text shaping, `ISpellChecker` does spelling,
+Microsoft Print to PDF does the export, and [MS-DOC], [MS-CFB] and ECMA-376 are all
+published specifications anyone can download.
+
+[LibreOffice](https://www.libreoffice.org) Writer is genuinely free, genuinely good, and
+further along than this will be for a long time. Use it today. OpenNote exists because a
+350MB office suite is not what most people wanted when they opened WordPad — and because
+nothing free reads a legacy `.doc` well, now that the last in-box reader has left with it.
+
+Likewise on the editor side: **VS Code and Notepad++ are free and excellent**, and this
+does not compete with them. Syntax highlighting is here because Scintilla provides it, not
+because anyone should switch.
+
+See [ROADMAP.md](ROADMAP.md) for the ordering.
 
 ---
 
@@ -32,114 +69,115 @@
 
 ---
 
-## Features
+## Getting Started
 
-| Feature | Description |
-|---------|-------------|
-| **Tabbed Interface** | Work with multiple documents simultaneously |
-| **Syntax Highlighting** | Language-aware highlighting for 100+ languages |
-| **SQLite Notes** | Store notes in a local database with full-text search |
-| **Cloud Sync** | Sync notes with GitHub or Google Drive |
-| **Session Restore** | Auto-save and restore your workspace |
-| **Side-by-Side Compare** | Visual diff between any two open documents |
-| **Shell Integration** | Run selected text in CMD or PowerShell (with admin) |
-| **Cross-Tab Search** | Find and replace across all open tabs |
+From a clean machine:
 
-### Core Editing
-- Find & Replace with match case and whole word options
-- Word wrap, zoom, and customizable fonts
-- Multi-level undo/redo history
-- Go to line (Ctrl+G)
+1. Install **Visual Studio 2022** with the *Desktop development with C++* workload, and
+   **CMake 3.16+** (the Visual Studio installer can provide both). Windows 10 or 11.
 
-### Notes Database
-- SQLite storage with FTS5 full-text search
-- Notes browser with search and file size display
-- Import files to notes, export notes to files
-- Rename and organize your notes
-- Cloud sync with GitHub or Google Drive
+2. Clone and build:
 
-### Keyboard Shortcuts
+   ```powershell
+   git clone https://github.com/sp00nznet/opennote.git
+   cd opennote
+   cmake -B build -G "Visual Studio 17 2022" -A x64
+   cmake --build build --config Release
+   ```
 
-| Shortcut | Action | Shortcut | Action |
-|----------|--------|----------|--------|
+   SQLite and Scintilla are vendored in `lib/`. There is nothing else to fetch.
+
+3. Run it:
+
+   ```powershell
+   .\build\bin\OpenNote.exe
+   ```
+
+   An empty tab opens. Your notes database is created at
+   `%APPDATA%\OpenNote\opennote.db` the first time you save a note.
+
+---
+
+## Usage
+
+```powershell
+OpenNote.exe                 # empty tab
+OpenNote.exe notes.txt       # open a file in a tab
+```
+
+### What it does
+
+| | |
+|---|---|
+| **Tabs** | Several documents at once, with the session restored on next launch |
+| **Syntax highlighting** | Via Scintilla — 100+ languages |
+| **Note store** | SQLite with FTS5 full-text search, browsable, import and export |
+| **Compare** | Side-by-side diff between any two open documents |
+| **Cross-tab search** | Find and replace across every open tab |
+| **Shell integration** | Run selected text through CMD or PowerShell |
+| **Cloud sync** | Optional, to your own GitHub or Google Drive. See the caveats below |
+
+### Keyboard
+
+| | | | |
+|---|---|---|---|
 | `Ctrl+N` | New file | `Ctrl+F` | Find |
 | `Ctrl+O` | Open file | `Ctrl+H` | Replace |
-| `Ctrl+S` | Save | `Ctrl+G` | Go To Line |
-| `Ctrl+W` | Close tab | `F3` | Find Next |
-| `Ctrl+Tab` | Next tab | `Ctrl++` | Zoom In |
-| `Ctrl+Shift+Tab` | Previous tab | `Ctrl+-` | Zoom Out |
+| `Ctrl+S` | Save | `Ctrl+G` | Go to line |
+| `Ctrl+W` | Close tab | `F3` | Find next |
+| `Ctrl+Tab` | Next tab | `Ctrl++` | Zoom in |
+| `Ctrl+Shift+Tab` | Previous tab | `Ctrl+-` | Zoom out |
+
+### Cloud sync
+
+Off unless you connect an account, and it talks to GitHub or Google directly — there is
+no server in between and this project does not operate one.
+
+It is also the least finished part of the codebase. Tokens are currently stored in
+cleartext and a released build would carry an OAuth client secret inside it. Both are
+being fixed in v0.2.0; both are described in full in [SECURITY.md](SECURITY.md). A build
+made without the optional `GH_OAUTH_CLIENT_ID` / `GOOGLE_CLIENT_ID` CMake variables has
+no credentials in it and simply does not offer sync.
+
+### Configuration
+
+Everything lives in `%APPDATA%\OpenNote\opennote.db` — settings, notes and session. There
+is no config file to edit and no registry key to find. Deleting that one file resets the
+application completely.
 
 ---
 
-## Quick Start
+## Building from source
 
-```bash
-# Clone the repository
-git clone https://github.com/sp00nznet/OpenNote.git
-cd OpenNote
+Covered under [Getting Started](#getting-started) above; that is the only way to run it
+right now. `cmake -B build && cmake --build build --config Release` is the whole thing.
 
-# Build with CMake
-cmake -B build
-cmake --build build --config Release
-
-# Run
-./build/bin/OpenNote.exe
-```
-
-**Requirements:** Windows 10/11, Visual Studio 2022, CMake 3.16+
-
-See [BUILDING.md](BUILDING.md) for detailed build instructions.
+Do not pass the OAuth CMake variables for a normal build — see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-## Project Structure
+## Project structure
 
 ```
-OpenNote/
-├── src/           # Source code
-│   ├── ui/        # Window, tabs, dialogs
-│   ├── core/      # Document, file I/O, search
-│   ├── db/        # SQLite, notes repository
-│   └── sync/      # OAuth, cloud sync
-├── res/           # Resources (icons, dialogs)
-├── lib/           # Third-party (SQLite, Scintilla)
-├── include/       # Headers
-└── docs/          # Documentation
+src/ui/      Window, tabs, editor, dialogs
+src/core/    Document, file I/O, search
+src/db/      SQLite, notes and links repositories
+src/sync/    OAuth, GitHub and Google Drive sync
+res/         Icons, dialogs, manifest
+lib/         Vendored SQLite and Scintilla
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed documentation.
-
----
-
-## Configuration
-
-Settings are stored in `%APPDATA%\OpenNote\opennote.db`
-
-- **Auto-save Session** - Save all tabs on exit
-- **Default Font Size** - Set preferred editor font size
-- **Theme** - Light or dark color scheme
-- **Cloud Sync** - Connect GitHub or Google Drive account
+See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
 ## Contributing
 
-Contributions welcome! Please open an issue or pull request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing`)
-5. Open a Pull Request
-
----
+Issues and pull requests welcome — [CONTRIBUTING.md](CONTRIBUTING.md). It also carries the
+rule that matters most for the format work ahead: nothing derived from a proprietary
+binary is ever committed.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
-
----
-
-<p align="center">
-  Made with C and Win32 for Windows power users
-</p>
+MIT — see [LICENSE](LICENSE).

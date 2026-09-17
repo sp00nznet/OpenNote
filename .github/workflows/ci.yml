@@ -1,0 +1,122 @@
+# OpenNote — build and release (GitHub Actions)
+#
+# Windows-only (Win32 + Scintilla + SQLite), so everything runs on windows-latest.
+#
+#  - Every push to main and every pull request builds Release and uploads the bare
+#    executable and the installer as run artifacts.
+#  - A version tag (vX.Y.Z) additionally publishes a GitHub Release with both assets
+#    attached. Cut one with:  git tag v0.2.0 && git push origin v0.2.0
+#
+# No secrets are used. The OAuth CMake variables are deliberately not passed: a client
+# secret inside a binary handed to users is not a secret. See SECURITY.md. The effect is
+# that anyone can reproduce the published binary byte for byte from the tagged commit.
+
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write # needed to attach binaries to a release
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build (Release)
+        run: cmake --build build --config Release
+
+      # The tag drives the installer's version so it cannot drift from what shipped.
+      # Untagged builds are 0.0.0 rather than a number that looks like a release.
+      - name: Derive version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $env:GITHUB_REF_NAME.TrimStart('v')
+          } else { '0.0.0' }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      # Inno Setup is preinstalled on the windows-latest image; install it only if that
+      # ever stops being true, rather than spending a minute on choco every run.
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          & $iscc "/DMyAppVersion=${{ steps.ver.outputs.version }}" installer\OpenNoteSetup.iss
+
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          # CMakeLists pins RUNTIME_OUTPUT_DIRECTORY per config, so the exe lands in
+          # build\bin directly, not under a build\bin\Release subdirectory.
+          Copy-Item build\bin\OpenNote.exe dist\
+          Copy-Item build\installer\OpenNoteSetup.exe dist\
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opennote-windows-x64
+          path: dist/
+
+      # Only on a version tag. Both assets are published, because which one someone
+      # wants depends on whether they want anything left on the machine afterwards.
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/OpenNote.exe
+            dist/OpenNoteSetup.exe
+          generate_release_notes: true
+          body: |
+            ## Which download?
+
+            ### `OpenNote.exe` — the bare executable
+
+            Run it, close it, delete it. Nothing is installed, nothing is written to the
+            registry, and nothing is left running when you are not using it.
+
+            **You do not get:** file associations, the "Open with OpenNote" entry in
+            Explorer's context menu, a Start Menu shortcut, or an uninstaller. You open
+            files from inside the application, or by dragging them onto it.
+
+            ### `OpenNoteSetup.exe` — the installer
+
+            Everything above, plus:
+
+            - OpenNote offered as a handler for `.txt`, `.log`, `.md` and `.ini`. It does
+              **not** take over as the default for any of them.
+            - "Open with OpenNote" on the Explorer context menu for any file.
+            - Start Menu entry, optional desktop shortcut, and an uninstaller.
+
+            Installs for the current user by default and does not need administrator
+            rights. Choosing to elevate installs for all users instead.
+
+            ### Either way
+
+            Both write notes to the same database at `%APPDATA%\OpenNote\opennote.db`, so
+            you can start with one and switch to the other without losing anything.
+
+            Neither binary is code-signed, so SmartScreen will warn on first run — see
+            [SECURITY.md](https://github.com/sp00nznet/opennote/blob/main/SECURITY.md).
+            Both were built by this workflow from the tagged commit; the log is public.
+
+            ---
