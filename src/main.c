@@ -2,6 +2,7 @@
 #include "res/resource.h"
 #include "sync/crypto.h"
 #include "sync/oauth.h"
+#include "ui/editor_rich.h"
 
 // Global application state
 AppState* g_app = NULL;
@@ -27,6 +28,7 @@ static int RunSelfTest(void) {
     } checks[] = {
         { "crypto", Crypto_SelfTest },
         { "oauth",  OAuth_SelfTest  },
+        { "rich",   Rich_SelfTest   },
     };
 
     int failed = 0;
@@ -90,11 +92,23 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
         // Check if file exists
         if (GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES) {
-            // Open the file in a new tab
             Document* doc = Document_CreateFromFile(path);
             if (doc) {
                 Tab* tab = App_GetActiveTab();
-                if (tab) {
+
+                // The startup tab is a plain text view. An .rtf argument needs
+                // the rich one, so it gets its own tab rather than being poured
+                // into a control that would show its markup.
+                if (doc->format == FORMAT_RTF) {
+                    int idx = App_CreateTabEx(doc->title, FORMAT_RTF);
+                    if (idx >= 0) {
+                        Document_Destroy(g_app->tabs[idx]->document);
+                        g_app->tabs[idx]->document = doc;
+                        Document_Load(doc, g_app->tabs[idx]->hEditor);
+                        TabControl_UpdateTabTitle(idx);
+                        MainWindow_UpdateTitle();
+                    }
+                } else if (tab) {
                     Document_Destroy(tab->document);
                     tab->document = doc;
                     Document_Load(doc, tab->hEditor);

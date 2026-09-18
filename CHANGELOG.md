@@ -5,6 +5,52 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-09-18
+
+**The WordPad replacement.** Windows 11 24H2 removed WordPad; this is the milestone that
+answers it. OpenNote now opens, edits, prints and saves rich text documents.
+
+### Added
+- **Rich text documents.** `.rtf` files open in a RichEdit 4.1 view alongside the existing
+  plain text view, load and save through `EM_STREAMIN`/`EM_STREAMOUT`, and are offered in
+  the Open and Save dialogs. **File > New Rich Text Document** starts an empty one.
+- **Character formatting**: font family and size, text colour, bold, italic, underline,
+  strikethrough, superscript and subscript.
+- **Paragraph formatting**: left/centre/right/justified alignment, single, 1.5 and double
+  line spacing, bulleted and numbered lists, and increase/decrease indent.
+- **Formatting toolbar**, shown only while a rich text tab is active, with font and size
+  combos that follow the caret. Its buttons are drawn rather than loaded from a bitmap, so
+  they follow the system text colour.
+- **Insert picture** (uncompressed bitmaps), embedded as RTF so the image survives being
+  opened in other readers.
+- **Page Setup**, and **printing that pages properly** — the rich view renders through
+  `EM_FORMATRANGE` across as many sheets as the document needs, with margins measured from
+  the paper edge rather than from wherever the driver starts.
+- `Ctrl+B`, `Ctrl+I` and `Ctrl+U` accelerators. **Clear Formatting** on the Format menu.
+- Self-check coverage for the rich view, run by CI: RTF round trips through both a string
+  and a real file with bold, italic and font size intact; alignment and bullets round trip;
+  replace-all terminates when the replacement contains the search term; word lookup
+  reports correct bounds.
+
+### Changed
+- `Editor_*` now dispatches between the two views, so everything outside `editor.c` keeps
+  calling the same functions with an `HWND` and does not know which control is behind it.
+- Opening a document reuses the current tab only when that tab's view matches the
+  document's format. Four copies of that logic became one function; previously an `.rtf`
+  dropped onto a plain tab would have shown its markup.
+- The editor font, word wrap and tab size settings apply to the plain text view only. A
+  rich document carries its own fonts, and forcing the code font over it flattened the
+  document. New rich documents start on Calibri 11, as WordPad did.
+
+### Known issues
+- The toolbar's font and size combos show their value highlighted until first clicked.
+  Cosmetic only — the values are correct and editing works.
+- The rich view always wraps to the window. Turning wrapping off needs a page width to
+  wrap to instead, which arrives with pagination in v0.6.
+- Tables are weak and the view flows rather than showing page boundaries. Both are
+  RichEdit's limits, and both are lifted by the layout engine `.docx` requires — see
+  `ROADMAP.md`.
+
 ## [Unreleased]
 
 ### Added

@@ -1,4 +1,5 @@
 #include "supernote.h"
+#include "ui/toolbar.h"
 #include "res/resource.h"
 
 // Initialize application
@@ -292,6 +293,10 @@ void App_SaveSettings(void) {
 
 // Create a new tab
 int App_CreateTab(const WCHAR* title) {
+    return App_CreateTabEx(title, FORMAT_PLAIN);
+}
+
+int App_CreateTabEx(const WCHAR* title, DocumentFormat format) {
     if (g_app->tabCount >= MAX_TABS) return -1;
 
     // Allocate tab
@@ -305,8 +310,12 @@ int App_CreateTab(const WCHAR* title) {
         return -1;
     }
 
-    // Auto-create note in database for persistence
-    if (Database_IsOpen()) {
+    tab->document->format = format;
+
+    // Auto-create note in database for persistence. A rich document is not
+    // backed by a note: the notes table stores text, and storing RTF markup in
+    // it would put braces and control words into full-text search results.
+    if (Database_IsOpen() && format == FORMAT_PLAIN) {
         const WCHAR* noteTitle = title ? title : L"Untitled";
         int noteId = Notes_Create(noteTitle, L"");
         if (noteId > 0) {
@@ -324,8 +333,10 @@ int App_CreateTab(const WCHAR* title) {
         return -1;
     }
 
-    // Create editor
-    tab->hEditor = Editor_Create(g_app->hMainWindow);
+    // Create the view the format calls for.
+    tab->hEditor = (format == FORMAT_RTF)
+        ? Editor_CreateRich(g_app->hMainWindow)
+        : Editor_Create(g_app->hMainWindow);
     if (!tab->hEditor) {
         TabControl_RemoveTab(index);
         Document_Destroy(tab->document);
@@ -333,10 +344,14 @@ int App_CreateTab(const WCHAR* title) {
         return -1;
     }
 
-    // Apply user settings - Editor_SetFont now handles everything including theme colors
-    Editor_SetFont(tab->hEditor, g_app->hEditorFont);
-    Editor_SetWordWrap(tab->hEditor, g_app->wordWrap);
-    Editor_SetTabSize(tab->hEditor, g_app->tabSize);
+    // Apply user settings. The editor font, word wrap and tab size are plain
+    // text concerns -- a rich document carries its own fonts, and forcing the
+    // code font over the whole thing would flatten every document it opened.
+    if (format == FORMAT_PLAIN) {
+        Editor_SetFont(tab->hEditor, g_app->hEditorFont);
+        Editor_SetWordWrap(tab->hEditor, g_app->wordWrap);
+        Editor_SetTabSize(tab->hEditor, g_app->tabSize);
+    }
     Editor_SetZoom(tab->hEditor, g_app->zoomLevel);
 
     tab->index = index;
@@ -428,7 +443,9 @@ void App_SetActiveTab(int index) {
         SendMessageW(g_app->hMainWindow, WM_SIZE, SIZE_RESTORED, MAKELPARAM(rc.right, rc.bottom));
     }
 
-    // Update UI
+    // Update UI. The formatting toolbar shows or hides with the view kind via
+    // WM_SIZE above; this makes its buttons reflect the new caret position.
+    if (tab && tab->hEditor) FormatBar_SyncFromEditor(tab->hEditor);
     MainWindow_UpdateTitle();
     MainWindow_UpdateMenuState();
 

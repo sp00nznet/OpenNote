@@ -4,6 +4,7 @@
 // Document structure
 struct Document {
     DocumentType type;
+    DocumentFormat format;   // FORMAT_PLAIN or FORMAT_RTF -- picks the view
     TextEncoding encoding;
 
     // File-based document
@@ -37,6 +38,10 @@ const WCHAR* Document_GetTitle(Document* doc);
 void Document_UpdateTitle(Document* doc);
 BOOL Document_IsModified(Document* doc);
 void Document_SetModified(Document* doc, BOOL modified);
+
+// Which format a path implies, from its extension. Used to decide which view
+// a tab needs before the document is loaded into it.
+DocumentFormat Document_FormatForPath(const WCHAR* path);
 
 // Type checking
 BOOL Document_IsFile(Document* doc);

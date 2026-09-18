@@ -4,6 +4,35 @@
 #include <SciLexer.h>
 #include <Lexilla.h>
 #include <spellcheck.h>
+#include "ui/editor_rich.h"
+
+// ---------------------------------------------------------------------------
+// Which view is behind this HWND
+//
+// Two document views now exist: the Scintilla one in this file and the
+// RichEdit one in editor_rich.c. Everything outside keeps calling Editor_*
+// with an HWND, and the functions below dispatch. The kind is stamped on the
+// window at creation rather than derived from its class name, so answering is
+// a property lookup rather than a string compare on every call.
+// ---------------------------------------------------------------------------
+
+#define EDITOR_KIND_PROP L"OpenNoteEditorKind"
+
+static void Editor_SetKind(HWND hEditor, EditorKind kind) {
+    // +1 so the stored value is never NULL, which GetPropW cannot distinguish
+    // from "no such property".
+    SetPropW(hEditor, EDITOR_KIND_PROP, (HANDLE)(INT_PTR)(kind + 1));
+}
+
+EditorKind Editor_GetKind(HWND hEditor) {
+    if (!hEditor) return EDITOR_KIND_PLAIN;
+    INT_PTR v = (INT_PTR)GetPropW(hEditor, EDITOR_KIND_PROP);
+    return v ? (EditorKind)(v - 1) : EDITOR_KIND_PLAIN;
+}
+
+BOOL Editor_IsRich(HWND hEditor) {
+    return Editor_GetKind(hEditor) == EDITOR_KIND_RICH;
+}
 
 // Define GUIDs for spell checker (Windows 8+)
 // {7AB36653-1796-484B-BDFA-E74F1DB7C1DC}
@@ -679,6 +708,7 @@ static void Editor_SetupBashStyles(HWND hEditor) {
 
 // Set lexer based on file extension
 void Editor_SetLexerFromExtension(HWND hEditor, const WCHAR* filename) {
+    if (Editor_IsRich(hEditor)) return;
     if (!hEditor || !filename) return;
 
     const WCHAR* ext = wcsrchr(filename, L'.');
@@ -801,6 +831,7 @@ void Editor_SetLexerFromExtension(HWND hEditor, const WCHAR* filename) {
 
 // Apply current theme to an editor (used when theme changes)
 void Editor_ApplyTheme(HWND hEditor, const WCHAR* filename) {
+    if (Editor_IsRich(hEditor)) return;
     if (!hEditor) return;
 
     // Reapply base styles with new theme
@@ -915,6 +946,7 @@ HWND Editor_Create(HWND hParent) {
     );
 
     if (hEdit) {
+        Editor_SetKind(hEdit, EDITOR_KIND_PLAIN);
         // Single initialization path for all editors
         Editor_FullInitialize(hEdit);
     }
@@ -922,8 +954,19 @@ HWND Editor_Create(HWND hParent) {
     return hEdit;
 }
 
+// The rich text view. Creation lives in editor_rich.c; what happens here is
+// stamping the kind so every Editor_* call afterwards routes correctly.
+HWND Editor_CreateRich(HWND hParent) {
+    HWND hEdit = Rich_Create(hParent);
+    if (hEdit) {
+        Editor_SetKind(hEdit, EDITOR_KIND_RICH);
+    }
+    return hEdit;
+}
+
 // Set text content
 void Editor_SetText(HWND hEditor, const WCHAR* text) {
+    if (Editor_IsRich(hEditor)) { Rich_SetText(hEditor, text); return; }
     if (!hEditor) return;
 
     // Convert to UTF-8 for Scintilla
@@ -945,6 +988,7 @@ void Editor_SetText(HWND hEditor, const WCHAR* text) {
 
 // Get text content (caller must free)
 WCHAR* Editor_GetText(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) return Rich_GetText(hEditor);
     if (!hEditor) return NULL;
 
     int utf8Len = (int)SciCall(hEditor, SCI_GETLENGTH, 0, 0) + 1;
@@ -966,12 +1010,14 @@ WCHAR* Editor_GetText(HWND hEditor) {
 
 // Get text length
 int Editor_GetTextLength(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) return Rich_GetTextLength(hEditor);
     if (!hEditor) return 0;
     return (int)SciCall(hEditor, SCI_GETLENGTH, 0, 0);
 }
 
 // Get selection
 void Editor_GetSelection(HWND hEditor, int* start, int* end) {
+    if (Editor_IsRich(hEditor)) { Rich_GetSelection(hEditor, start, end); return; }
     if (!hEditor) return;
     if (start) *start = (int)SciCall(hEditor, SCI_GETSELECTIONSTART, 0, 0);
     if (end) *end = (int)SciCall(hEditor, SCI_GETSELECTIONEND, 0, 0);
@@ -979,12 +1025,14 @@ void Editor_GetSelection(HWND hEditor, int* start, int* end) {
 
 // Set selection
 void Editor_SetSelection(HWND hEditor, int start, int end) {
+    if (Editor_IsRich(hEditor)) { Rich_SetSelection(hEditor, start, end); return; }
     if (!hEditor) return;
     SciCall(hEditor, SCI_SETSEL, start, end);
 }
 
 // Replace selection
 void Editor_ReplaceSelection(HWND hEditor, const WCHAR* text) {
+    if (Editor_IsRich(hEditor)) { Rich_ReplaceSelection(hEditor, text); return; }
     if (!hEditor) return;
 
     // Convert to UTF-8
@@ -1003,6 +1051,7 @@ void Editor_ReplaceSelection(HWND hEditor, const WCHAR* text) {
 
 // Get selected text (caller must free)
 WCHAR* Editor_GetSelectedText(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) return Rich_GetSelectedText(hEditor);
     if (!hEditor) return NULL;
 
     int start, end;
@@ -1028,6 +1077,7 @@ WCHAR* Editor_GetSelectedText(HWND hEditor) {
 
 // Get cursor position (line and column)
 void Editor_GetCursorPos(HWND hEditor, int* line, int* column) {
+    if (Editor_IsRich(hEditor)) { Rich_GetCursorPos(hEditor, line, column); return; }
     if (!hEditor) return;
 
     int pos = (int)SciCall(hEditor, SCI_GETCURRENTPOS, 0, 0);
@@ -1040,6 +1090,7 @@ void Editor_GetCursorPos(HWND hEditor, int* line, int* column) {
 
 // Go to line
 void Editor_GotoLine(HWND hEditor, int line) {
+    if (Editor_IsRich(hEditor)) { Rich_GotoLine(hEditor, line); return; }
     if (!hEditor || line < 1) return;
 
     int lineIndex = (int)SciCall(hEditor, SCI_POSITIONFROMLINE, line - 1, 0);
@@ -1048,12 +1099,14 @@ void Editor_GotoLine(HWND hEditor, int line) {
 
 // Get line count
 int Editor_GetLineCount(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) return Rich_GetLineCount(hEditor);
     if (!hEditor) return 0;
     return (int)SciCall(hEditor, SCI_GETLINECOUNT, 0, 0);
 }
 
 // Get current line number
 int Editor_GetCurrentLine(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) return Rich_GetCurrentLine(hEditor);
     int line, col;
     Editor_GetCursorPos(hEditor, &line, &col);
     return line;
@@ -1061,43 +1114,51 @@ int Editor_GetCurrentLine(HWND hEditor) {
 
 // Undo/Redo
 BOOL Editor_CanUndo(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) return Rich_CanUndo(hEditor);
     if (!hEditor) return FALSE;
     return (BOOL)SciCall(hEditor, SCI_CANUNDO, 0, 0);
 }
 
 BOOL Editor_CanRedo(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) return Rich_CanRedo(hEditor);
     if (!hEditor) return FALSE;
     return (BOOL)SciCall(hEditor, SCI_CANREDO, 0, 0);
 }
 
 void Editor_Undo(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) { Rich_Undo(hEditor); return; }
     if (!hEditor) return;
     SciCall(hEditor, SCI_UNDO, 0, 0);
 }
 
 void Editor_Redo(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) { Rich_Redo(hEditor); return; }
     if (!hEditor) return;
     SciCall(hEditor, SCI_REDO, 0, 0);
 }
 
 // Clipboard operations
 void Editor_Cut(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) { Rich_Cut(hEditor); return; }
     if (!hEditor) return;
     SciCall(hEditor, SCI_CUT, 0, 0);
 }
 
 void Editor_Copy(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) { Rich_Copy(hEditor); return; }
     if (!hEditor) return;
     SciCall(hEditor, SCI_COPY, 0, 0);
 }
 
 void Editor_Paste(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) { Rich_Paste(hEditor); return; }
     if (!hEditor) return;
     SciCall(hEditor, SCI_PASTE, 0, 0);
 }
 
 // Set word wrap
 void Editor_SetWordWrap(HWND hEditor, BOOL wrap) {
+    if (Editor_IsRich(hEditor)) { Rich_SetWordWrap(hEditor, wrap); return; }
     if (!hEditor) return;
     SciCall(hEditor, SCI_SETWRAPMODE, wrap ? SC_WRAP_WORD : SC_WRAP_NONE, 0);
 }
@@ -1131,6 +1192,7 @@ static int GetWindowDPI(HWND hwnd) {
 
 // Set font
 void Editor_SetFont(HWND hEditor, HFONT hFont) {
+    if (Editor_IsRich(hEditor)) { Rich_SetFont(hEditor, hFont); return; }
     if (!hEditor) return;
     (void)hFont;  // We read directly from g_app now
 
@@ -1165,6 +1227,7 @@ void Editor_SetFont(HWND hEditor, HFONT hFont) {
 
 // Set tab size
 void Editor_SetTabSize(HWND hEditor, int tabSize) {
+    if (Editor_IsRich(hEditor)) return;
     if (!hEditor) return;
     SciCall(hEditor, SCI_SETTABWIDTH, tabSize, 0);
     SciCall(hEditor, SCI_SETINDENT, tabSize, 0);
@@ -1172,6 +1235,7 @@ void Editor_SetTabSize(HWND hEditor, int tabSize) {
 
 // Set zoom level
 void Editor_SetZoom(HWND hEditor, int zoomPercent) {
+    if (Editor_IsRich(hEditor)) { Rich_SetZoom(hEditor, zoomPercent); return; }
     if (!hEditor) return;
     // Scintilla zoom is in points relative to normal (-10 to +20)
     int zoom = (zoomPercent - 100) / 10;
@@ -1180,11 +1244,13 @@ void Editor_SetZoom(HWND hEditor, int zoomPercent) {
 
 // Get/Set modified state
 BOOL Editor_GetModified(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) return Rich_GetModified(hEditor);
     if (!hEditor) return FALSE;
     return (BOOL)SciCall(hEditor, SCI_GETMODIFY, 0, 0);
 }
 
 void Editor_SetModified(HWND hEditor, BOOL modified) {
+    if (Editor_IsRich(hEditor)) { Rich_SetModified(hEditor, modified); return; }
     if (!hEditor) return;
     if (!modified) {
         SciCall(hEditor, SCI_SETSAVEPOINT, 0, 0);
@@ -1193,6 +1259,7 @@ void Editor_SetModified(HWND hEditor, BOOL modified) {
 
 // Find text
 int Editor_FindText(HWND hEditor, const WCHAR* text, BOOL matchCase, BOOL wholeWord, BOOL forward) {
+    if (Editor_IsRich(hEditor)) return Rich_FindText(hEditor, text, matchCase, wholeWord, forward);
     if (!hEditor || !text || !text[0]) return -1;
 
     // Convert search text to UTF-8
@@ -1251,6 +1318,7 @@ int Editor_FindText(HWND hEditor, const WCHAR* text, BOOL matchCase, BOOL wholeW
 
 // Replace text
 int Editor_ReplaceText(HWND hEditor, const WCHAR* findText, const WCHAR* replaceText, BOOL matchCase, BOOL wholeWord) {
+    if (Editor_IsRich(hEditor)) return Rich_ReplaceText(hEditor, findText, replaceText, matchCase, wholeWord);
     if (!hEditor || !findText || !findText[0]) return -1;
 
     // Check if current selection matches
@@ -1276,6 +1344,7 @@ int Editor_ReplaceText(HWND hEditor, const WCHAR* findText, const WCHAR* replace
 
 // Replace all
 int Editor_ReplaceAll(HWND hEditor, const WCHAR* findText, const WCHAR* replaceText, BOOL matchCase, BOOL wholeWord) {
+    if (Editor_IsRich(hEditor)) return Rich_ReplaceAll(hEditor, findText, replaceText, matchCase, wholeWord);
     if (!hEditor || !findText || !findText[0]) return 0;
 
     // Convert to UTF-8
@@ -1359,6 +1428,7 @@ void Editor_InsertTimeDate(HWND hEditor) {
 
 // Setup link indicator style
 void Editor_SetupLinkIndicator(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) return;
     if (!hEditor) return;
 
     // Configure link indicator - composited box style for visibility
@@ -1381,6 +1451,7 @@ void Editor_SetupLinkIndicator(HWND hEditor) {
 
 // Add link indicator at range
 void Editor_AddLinkIndicator(HWND hEditor, int start, int end) {
+    if (Editor_IsRich(hEditor)) return;
     if (!hEditor || start >= end) return;
 
     SciCall(hEditor, SCI_SETINDICATORCURRENT, INDICATOR_LINK, 0);
@@ -1389,6 +1460,7 @@ void Editor_AddLinkIndicator(HWND hEditor, int start, int end) {
 
 // Clear all link indicators
 void Editor_ClearLinkIndicators(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) return;
     if (!hEditor) return;
 
     int docLen = (int)SciCall(hEditor, SCI_GETLENGTH, 0, 0);
@@ -1398,6 +1470,7 @@ void Editor_ClearLinkIndicators(HWND hEditor) {
 
 // Refresh links from database for current document
 void Editor_RefreshLinks(HWND hEditor, Document* doc) {
+    if (Editor_IsRich(hEditor)) return;
     if (!hEditor || !doc) return;
 
     // Clear existing link indicators
@@ -1421,6 +1494,7 @@ void Editor_RefreshLinks(HWND hEditor, Document* doc) {
 
 // Get position from screen coordinates
 int Editor_GetPositionFromPoint(HWND hEditor, int x, int y) {
+    if (Editor_IsRich(hEditor)) return Rich_GetPositionFromPoint(hEditor, x, y);
     if (!hEditor) return -1;
 
     // Convert screen to client coordinates
@@ -1481,6 +1555,7 @@ void Editor_ShutdownSpellCheck(void) {
 
 // Add spell indicator at range
 void Editor_AddSpellIndicator(HWND hEditor, int start, int end) {
+    if (Editor_IsRich(hEditor)) return;
     if (!hEditor || start >= end) return;
 
     SciCall(hEditor, SCI_SETINDICATORCURRENT, INDICATOR_SPELL, 0);
@@ -1489,6 +1564,7 @@ void Editor_AddSpellIndicator(HWND hEditor, int start, int end) {
 
 // Clear all spell indicators
 void Editor_ClearSpellIndicators(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) return;
     if (!hEditor) return;
 
     int docLen = (int)SciCall(hEditor, SCI_GETLENGTH, 0, 0);
@@ -1498,6 +1574,7 @@ void Editor_ClearSpellIndicators(HWND hEditor) {
 
 // Check spelling of entire document
 void Editor_CheckSpelling(HWND hEditor) {
+    if (Editor_IsRich(hEditor)) return;  // rich view has no squiggle indicators yet
     if (!hEditor || !g_spellChecker) return;
 
     // Clear existing spell indicators
@@ -1609,6 +1686,7 @@ static int IndicatorNumber(EditorIndicator which) {
 }
 
 BOOL Editor_HasIndicatorAt(HWND hEditor, int pos, EditorIndicator which) {
+    if (Editor_IsRich(hEditor)) return FALSE;  // no indicators in the rich view
     if (!hEditor) return FALSE;
 
     int indicators = (int)SciCall(hEditor, SCI_INDICATORALLONFOR, pos, 0);
@@ -1616,6 +1694,7 @@ BOOL Editor_HasIndicatorAt(HWND hEditor, int pos, EditorIndicator which) {
 }
 
 void Editor_ReplaceRange(HWND hEditor, int start, int end, const WCHAR* text) {
+    if (Editor_IsRich(hEditor)) { Rich_ReplaceRange(hEditor, start, end, text); return; }
     if (!hEditor || !text || start > end) return;
 
     int utf8Len = WideCharToMultiByte(CP_UTF8, 0, text, -1, NULL, 0, NULL, NULL);
@@ -1633,6 +1712,7 @@ void Editor_ReplaceRange(HWND hEditor, int start, int end, const WCHAR* text) {
 }
 
 void Editor_ClearSpellIndicatorRange(HWND hEditor, int start, int end) {
+    if (Editor_IsRich(hEditor)) return;
     if (!hEditor || start >= end) return;
 
     SciCall(hEditor, SCI_SETINDICATORCURRENT, INDICATOR_SPELL, 0);
@@ -1643,6 +1723,7 @@ void Editor_ClearSpellIndicatorRange(HWND hEditor, int start, int end) {
 // offsets into the UTF-8 document, which is why the scan happens on the UTF-8
 // line rather than after converting to wide characters.
 WCHAR* Editor_GetWordAt(HWND hEditor, int pos, int* wordStart, int* wordEnd) {
+    if (Editor_IsRich(hEditor)) return Rich_GetWordAt(hEditor, pos, wordStart, wordEnd);
     if (!hEditor || !wordStart || !wordEnd) return NULL;
 
     int lineNum   = (int)SciCall(hEditor, SCI_LINEFROMPOSITION, pos, 0);

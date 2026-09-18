@@ -40,6 +40,8 @@ set(SUPERNOTE_SOURCES
     src/ui/mainwindow.c
     src/ui/tabcontrol.c
     src/ui/editor.c
+    src/ui/editor_rich.c
+    src/ui/toolbar.c
     src/ui/menubar.c
     src/ui/statusbar.c
     src/ui/dialogs.c

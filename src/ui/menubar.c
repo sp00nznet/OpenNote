@@ -9,6 +9,7 @@ HMENU MenuBar_Create(void) {
     // File menu
     HMENU hFileMenu = CreatePopupMenu();
     AppendMenuW(hFileMenu, MF_STRING, IDM_FILE_NEW, L"&New\tCtrl+N");
+    AppendMenuW(hFileMenu, MF_STRING, IDM_FILE_NEW_RICH, L"New &Rich Text Document");
     AppendMenuW(hFileMenu, MF_SEPARATOR, 0, NULL);
     AppendMenuW(hFileMenu, MF_STRING, IDM_FILE_OPEN, L"&Open...\tCtrl+O");
     AppendMenuW(hFileMenu, MF_STRING, IDM_FILE_OPEN_NOTE, L"&Browse Notes...");
@@ -23,6 +24,7 @@ HMENU MenuBar_Create(void) {
     AppendMenuW(hFileMenu, MF_SEPARATOR, 0, NULL);
     AppendMenuW(hFileMenu, MF_STRING, IDM_FILE_CLOSE_TAB, L"&Close Tab\tCtrl+W");
     AppendMenuW(hFileMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenuW(hFileMenu, MF_STRING, IDM_FILE_PAGE_SETUP, L"Page Set&up...");
     AppendMenuW(hFileMenu, MF_STRING, IDM_FILE_PRINT, L"&Print...\tCtrl+P");
     AppendMenuW(hFileMenu, MF_STRING, IDM_FILE_PRINT_PREVIEW, L"Print Pre&view...");
     AppendMenuW(hFileMenu, MF_SEPARATOR, 0, NULL);
@@ -63,6 +65,43 @@ HMENU MenuBar_Create(void) {
     AppendMenuW(hTabSizeMenu, MF_STRING, IDM_FORMAT_TABSIZE_4, L"4 spaces");
     AppendMenuW(hTabSizeMenu, MF_STRING, IDM_FORMAT_TABSIZE_8, L"8 spaces");
     AppendMenuW(hFormatMenu, MF_POPUP, (UINT_PTR)hTabSizeMenu, L"&Tab Size");
+
+    // Rich text formatting. Present always, greyed unless a rich text tab is
+    // active -- hiding and rebuilding the menu would make the items jump
+    // around depending on which tab you came from.
+    AppendMenuW(hFormatMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenuW(hFormatMenu, MF_STRING, IDM_FORMAT_BOLD, L"&Bold\tCtrl+B");
+    AppendMenuW(hFormatMenu, MF_STRING, IDM_FORMAT_ITALIC, L"&Italic\tCtrl+I");
+    AppendMenuW(hFormatMenu, MF_STRING, IDM_FORMAT_UNDERLINE, L"&Underline\tCtrl+U");
+    AppendMenuW(hFormatMenu, MF_STRING, IDM_FORMAT_STRIKE, L"Stri&kethrough");
+    AppendMenuW(hFormatMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenuW(hFormatMenu, MF_STRING, IDM_FORMAT_SUPERSCRIPT, L"Su&perscript");
+    AppendMenuW(hFormatMenu, MF_STRING, IDM_FORMAT_SUBSCRIPT, L"Su&bscript");
+    AppendMenuW(hFormatMenu, MF_STRING, IDM_FORMAT_TEXTCOLOR, L"Text &Colour...");
+    AppendMenuW(hFormatMenu, MF_SEPARATOR, 0, NULL);
+
+    HMENU hAlignMenu = CreatePopupMenu();
+    AppendMenuW(hAlignMenu, MF_STRING, IDM_FORMAT_ALIGN_LEFT, L"&Left");
+    AppendMenuW(hAlignMenu, MF_STRING, IDM_FORMAT_ALIGN_CENTER, L"&Centre");
+    AppendMenuW(hAlignMenu, MF_STRING, IDM_FORMAT_ALIGN_RIGHT, L"&Right");
+    AppendMenuW(hAlignMenu, MF_STRING, IDM_FORMAT_ALIGN_JUSTIFY, L"&Justify");
+    AppendMenuW(hFormatMenu, MF_POPUP, (UINT_PTR)hAlignMenu, L"&Alignment");
+
+    HMENU hSpaceMenu = CreatePopupMenu();
+    AppendMenuW(hSpaceMenu, MF_STRING, IDM_FORMAT_LINESPACE_1, L"&Single");
+    AppendMenuW(hSpaceMenu, MF_STRING, IDM_FORMAT_LINESPACE_15, L"1.&5 lines");
+    AppendMenuW(hSpaceMenu, MF_STRING, IDM_FORMAT_LINESPACE_2, L"&Double");
+    AppendMenuW(hFormatMenu, MF_POPUP, (UINT_PTR)hSpaceMenu, L"Line &Spacing");
+
+    AppendMenuW(hFormatMenu, MF_STRING, IDM_FORMAT_BULLETS, L"Bulle&ted List");
+    AppendMenuW(hFormatMenu, MF_STRING, IDM_FORMAT_NUMBERING, L"&Numbered List");
+    AppendMenuW(hFormatMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenuW(hFormatMenu, MF_STRING, IDM_FORMAT_INDENT_MORE, L"Increase Inden&t");
+    AppendMenuW(hFormatMenu, MF_STRING, IDM_FORMAT_INDENT_LESS, L"&Decrease Indent");
+    AppendMenuW(hFormatMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenuW(hFormatMenu, MF_STRING, IDM_INSERT_PICTURE, L"Insert Pict&ure...");
+    AppendMenuW(hFormatMenu, MF_STRING, IDM_FORMAT_CLEAR, L"Clear F&ormatting");
+
     AppendMenuW(hMenu, MF_POPUP, (UINT_PTR)hFormatMenu, L"F&ormat");
 
     // View menu
@@ -153,6 +192,45 @@ void MenuBar_UpdateFormatMenu(HMENU hMenu) {
     CheckMenuItem(hMenu, IDM_FORMAT_TABSIZE_2, MF_BYCOMMAND | (g_app->tabSize == 2 ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(hMenu, IDM_FORMAT_TABSIZE_4, MF_BYCOMMAND | (g_app->tabSize == 4 ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(hMenu, IDM_FORMAT_TABSIZE_8, MF_BYCOMMAND | (g_app->tabSize == 8 ? MF_CHECKED : MF_UNCHECKED));
+
+    // The rich text items only mean something in a rich text tab.
+    Tab* tab = App_GetActiveTab();
+    HWND hEditor = tab ? tab->hEditor : NULL;
+    BOOL rich = Editor_IsRich(hEditor);
+
+    static const int RICH_ITEMS[] = {
+        IDM_FORMAT_BOLD, IDM_FORMAT_ITALIC, IDM_FORMAT_UNDERLINE, IDM_FORMAT_STRIKE,
+        IDM_FORMAT_SUPERSCRIPT, IDM_FORMAT_SUBSCRIPT, IDM_FORMAT_TEXTCOLOR,
+        IDM_FORMAT_ALIGN_LEFT, IDM_FORMAT_ALIGN_CENTER, IDM_FORMAT_ALIGN_RIGHT,
+        IDM_FORMAT_ALIGN_JUSTIFY, IDM_FORMAT_LINESPACE_1, IDM_FORMAT_LINESPACE_15,
+        IDM_FORMAT_LINESPACE_2, IDM_FORMAT_BULLETS, IDM_FORMAT_NUMBERING,
+        IDM_FORMAT_INDENT_MORE, IDM_FORMAT_INDENT_LESS, IDM_INSERT_PICTURE,
+        IDM_FORMAT_CLEAR,
+    };
+    for (int i = 0; i < (int)(sizeof(RICH_ITEMS) / sizeof(RICH_ITEMS[0])); i++) {
+        EnableMenuItem(hMenu, RICH_ITEMS[i],
+                       MF_BYCOMMAND | (rich ? MF_ENABLED : MF_GRAYED));
+    }
+
+    // Conversely, tab size and word wrap belong to the plain text view.
+    EnableMenuItem(hMenu, IDM_FORMAT_TABSIZE_2, MF_BYCOMMAND | (rich ? MF_GRAYED : MF_ENABLED));
+    EnableMenuItem(hMenu, IDM_FORMAT_TABSIZE_4, MF_BYCOMMAND | (rich ? MF_GRAYED : MF_ENABLED));
+    EnableMenuItem(hMenu, IDM_FORMAT_TABSIZE_8, MF_BYCOMMAND | (rich ? MF_GRAYED : MF_ENABLED));
+    // The rich view always wraps to the window -- see Rich_SetWordWrap.
+    EnableMenuItem(hMenu, IDM_FORMAT_WORDWRAP, MF_BYCOMMAND | (rich ? MF_GRAYED : MF_ENABLED));
+
+    if (rich) {
+        CheckMenuItem(hMenu, IDM_FORMAT_BOLD,      MF_BYCOMMAND | (Rich_HasEffect(hEditor, CFE_BOLD)      ? MF_CHECKED : MF_UNCHECKED));
+        CheckMenuItem(hMenu, IDM_FORMAT_ITALIC,    MF_BYCOMMAND | (Rich_HasEffect(hEditor, CFE_ITALIC)    ? MF_CHECKED : MF_UNCHECKED));
+        CheckMenuItem(hMenu, IDM_FORMAT_UNDERLINE, MF_BYCOMMAND | (Rich_HasEffect(hEditor, CFE_UNDERLINE) ? MF_CHECKED : MF_UNCHECKED));
+        CheckMenuItem(hMenu, IDM_FORMAT_STRIKE,    MF_BYCOMMAND | (Rich_HasEffect(hEditor, CFE_STRIKEOUT) ? MF_CHECKED : MF_UNCHECKED));
+
+        WORD align = Rich_GetAlignment(hEditor);
+        CheckMenuItem(hMenu, IDM_FORMAT_ALIGN_LEFT,    MF_BYCOMMAND | (align == PFA_LEFT    ? MF_CHECKED : MF_UNCHECKED));
+        CheckMenuItem(hMenu, IDM_FORMAT_ALIGN_CENTER,  MF_BYCOMMAND | (align == PFA_CENTER  ? MF_CHECKED : MF_UNCHECKED));
+        CheckMenuItem(hMenu, IDM_FORMAT_ALIGN_RIGHT,   MF_BYCOMMAND | (align == PFA_RIGHT   ? MF_CHECKED : MF_UNCHECKED));
+        CheckMenuItem(hMenu, IDM_FORMAT_ALIGN_JUSTIFY, MF_BYCOMMAND | (align == PFA_JUSTIFY ? MF_CHECKED : MF_UNCHECKED));
+    }
 }
 
 // Update View menu state

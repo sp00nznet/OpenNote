@@ -171,3 +171,35 @@
 #define WM_APP_TRAY_CALLBACK    (WM_APP + 4)
 
 #endif // RESOURCE_H
+
+// Rich text formatting (v0.5 -- the WordPad replacement)
+#define IDM_FORMAT_BOLD          7300
+#define IDM_FORMAT_ITALIC        7301
+#define IDM_FORMAT_UNDERLINE     7302
+#define IDM_FORMAT_STRIKE        7303
+#define IDM_FORMAT_TEXTCOLOR     7304
+#define IDM_FORMAT_ALIGN_LEFT    7305
+#define IDM_FORMAT_ALIGN_CENTER  7306
+#define IDM_FORMAT_ALIGN_RIGHT   7307
+#define IDM_FORMAT_ALIGN_JUSTIFY 7308
+#define IDM_FORMAT_BULLETS       7309
+#define IDM_FORMAT_NUMBERING     7310
+#define IDM_FORMAT_INDENT_MORE   7311
+#define IDM_FORMAT_INDENT_LESS   7312
+#define IDM_FORMAT_CLEAR         7313
+#define IDM_FORMAT_PARAGRAPH     7314
+#define IDM_FORMAT_SUPERSCRIPT   7315
+#define IDM_FORMAT_SUBSCRIPT     7316
+#define IDM_FORMAT_HIGHLIGHT     7317
+#define IDM_FORMAT_LINESPACE_1   7318
+#define IDM_FORMAT_LINESPACE_15  7319
+#define IDM_FORMAT_LINESPACE_2   7320
+
+#define IDM_FILE_NEW_RICH        7330
+#define IDM_FILE_PAGE_SETUP      7331
+#define IDM_INSERT_PICTURE       7332
+
+// Toolbar child controls
+#define IDC_TOOLBAR              7340
+#define IDC_FONT_COMBO           7341
+#define IDC_SIZE_COMBO           7342

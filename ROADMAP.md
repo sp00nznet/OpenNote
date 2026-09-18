@@ -6,10 +6,8 @@ The short version: **Windows shipped a rich text editor for thirty years and rem
 in 2024.** WordPad is gone from Windows 11 24H2 and from Windows Server 2025. The
 replacement Microsoft points you at is a subscription. OpenNote is aiming at that hole.
 
-**No binaries are published until v0.5.0.** The release pipeline is built and working,
-but it only fires on a `v*` tag and no tag will be cut before the WordPad milestone. Until
-then the only way to run OpenNote is to build it, which is one command. Shipping downloads
-for an alpha invites people to judge the project by it.
+**v0.5.0 is released**, and with it the first published binaries: a bare executable and
+an installer, built by CI from the tagged commit.
 
 Nothing below is a promise of a date.
 
@@ -65,21 +63,24 @@ The part UltraEdit (~$80/yr), EmEditor ($40–80/yr) and Beyond Compare ($35–7
 - [ ] Harness: fixed file corpus with open time and peak working set tracked in CI, and
       the current figures in the README
 
-## v0.5.0 — The WordPad replacement
+## v0.5.0 — The WordPad replacement — **done**
 
-**The first big milestone.** RTF is WordPad's native format, its specification (RTF
-1.9.1) is published, and Windows' in-box RichEdit control reads and writes it — which is
-essentially how WordPad itself worked.
+RTF is WordPad's native format, its specification (RTF 1.9.1) is published, and Windows'
+in-box RichEdit control reads and writes it — which is essentially how WordPad itself
+worked.
 
-- [ ] Rich text document type alongside the plain text one
-- [ ] RTF round-trip: styles, lists, tables, images
-- [ ] Formatting toolbar, ruler, tab stops
-- [ ] Spell check via the in-box `ISpellChecker` API
-- [ ] Print and page setup
+- [x] Rich text document type alongside the plain text one
+- [x] RTF round-trip: character and paragraph formatting, lists, images
+- [x] Formatting toolbar
+- [x] Print and page setup, paging across as many sheets as the document needs
+- [ ] Ruler and tab stops — deferred, they want the pagination v0.6 brings
+- [ ] Spell check in the rich view — the `ISpellChecker` plumbing is shared, but the
+      squiggle indicators are Scintilla's; the rich view needs its own
 
 Built on RichEdit deliberately, to get a working replacement out while the removal is
-still recent. RichEdit's ceiling is real — weak tables, no true pagination — and the
-upgrade path is the DirectWrite engine in v0.6.0.
+still recent. RichEdit's ceiling is real — weak tables, no true pagination, and word wrap
+that cannot be turned off without a page width to wrap to — and the upgrade path is the
+DirectWrite engine in v0.6.0.
 
 ## v0.6.0 and beyond — Word
 

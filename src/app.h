@@ -56,8 +56,10 @@ BOOL App_Run(void);
 void App_LoadSettings(void);
 void App_SaveSettings(void);
 
-// Tab management
+// Tab management. App_CreateTab makes a plain text tab; App_CreateTabEx picks
+// the view from the format, which is how .rtf files land in the rich editor.
 int App_CreateTab(const WCHAR* title);
+int App_CreateTabEx(const WCHAR* title, DocumentFormat format);
 void App_CloseTab(int index);
 void App_SetActiveTab(int index);
 Tab* App_GetActiveTab(void);

@@ -1,8 +1,20 @@
 #ifndef EDITOR_H
 #define EDITOR_H
 
+// Which view implements a given editor window. Callers use Editor_* for
+// everything; these exist for the few places that must know, such as deciding
+// whether to show the formatting toolbar.
+typedef enum {
+    EDITOR_KIND_PLAIN,   // Scintilla, in editor.c
+    EDITOR_KIND_RICH     // RichEdit, in editor_rich.c
+} EditorKind;
+
+EditorKind Editor_GetKind(HWND hEditor);
+BOOL       Editor_IsRich(HWND hEditor);
+
 // Editor control creation
-HWND Editor_Create(HWND hParent);
+HWND Editor_Create(HWND hParent);      // Plain text view
+HWND Editor_CreateRich(HWND hParent);  // Rich text view
 
 // Text operations
 void Editor_SetText(HWND hEditor, const WCHAR* text);

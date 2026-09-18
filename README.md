@@ -28,25 +28,36 @@ payware, read the published spec it is hiding behind, give it away.
 
 ## Status
 
-**v0.2.0-dev — alpha.** Usable daily, not yet released. There are no downloads on the
-releases page and there will not be until the milestone below is reached; until then,
-build it, which takes one command.
+**v0.5.0 — alpha, and the WordPad milestone is reached.** Downloads are on the
+[releases page](https://github.com/sp00nznet/opennote/releases/latest): a bare executable
+and an installer, with the release notes saying what each one does and does not give you.
 
 Three security issues are known and documented in [SECURITY.md](SECURITY.md). A build
 made from source without the optional OAuth variables is not affected by any of them.
 
-### Where this is going
+### The WordPad replacement
 
 **Windows shipped a rich text editor for thirty years and removed it.** WordPad is gone
 from Windows 11 24H2 and Windows Server 2025. Microsoft's suggested replacement is a
 subscription: Microsoft 365 is $70–100/yr, or $150 once for Office 2024.
 
-The first real milestone here is a WordPad replacement — RTF, formatting, tables, spell
-check, print — and the stretch is the part Word actually gets paid for: `.docx`, proper
-page layout, `.doc`, track changes. Everything needed for that is already in Windows and
-already paid for. DirectWrite does the text shaping, `ISpellChecker` does spelling,
-Microsoft Print to PDF does the export, and [MS-DOC], [MS-CFB] and ECMA-376 are all
-published specifications anyone can download.
+As of v0.5.0 OpenNote opens, edits and saves `.rtf` — fonts, sizes, colours, bold, italic,
+underline, strikethrough, super/subscript, alignment, line spacing, bullets, numbering,
+indent, pictures — with a formatting toolbar, spell check, page setup and multi-page
+printing. The whole application is a **3.6MB executable** with no runtime to install.
+
+![Rich text editing](gfx/rich-text.png)
+
+It is built on Windows' own RichEdit control, which is how WordPad itself worked. That
+has a known ceiling: tables are weak and the view flows rather than showing page
+boundaries. Both are lifted in v0.6 by the layout engine `.docx` needs anyway — see
+[ROADMAP.md](ROADMAP.md).
+
+The stretch is the part Word actually gets paid for: `.docx`, real page layout, `.doc`,
+track changes. Everything needed for that is already in Windows and already paid for.
+DirectWrite does the text shaping, `ISpellChecker` does spelling, Microsoft Print to PDF
+does the export, and [MS-DOC], [MS-CFB] and ECMA-376 are all published specifications
+anyone can download.
 
 [LibreOffice](https://www.libreoffice.org) Writer is genuinely free, genuinely good, and
 further along than this will be for a long time. Use it today. OpenNote exists because a
@@ -91,6 +102,7 @@ From a clean machine:
 
    ```powershell
    .\build\bin\OpenNote.exe
+   .\build\bin\OpenNote.exe --selftest   # check the crypto and RTF paths
    ```
 
    An empty tab opens. Your notes database is created at
@@ -103,12 +115,15 @@ From a clean machine:
 ```powershell
 OpenNote.exe                 # empty tab
 OpenNote.exe notes.txt       # open a file in a tab
+OpenNote.exe report.rtf      # open a rich text document
+OpenNote.exe --selftest      # run the built-in checks and exit
 ```
 
 ### What it does
 
 | | |
 |---|---|
+| **Rich text** | `.rtf` documents: fonts, colours, alignment, lists, indent, pictures, printing |
 | **Tabs** | Several documents at once, with the session restored on next launch |
 | **Syntax highlighting** | Via Scintilla — 100+ languages |
 | **Note store** | SQLite with FTS5 full-text search, browsable, import and export |
@@ -127,6 +142,8 @@ OpenNote.exe notes.txt       # open a file in a tab
 | `Ctrl+W` | Close tab | `F3` | Find next |
 | `Ctrl+Tab` | Next tab | `Ctrl++` | Zoom in |
 | `Ctrl+Shift+Tab` | Previous tab | `Ctrl+-` | Zoom out |
+| `Ctrl+B` | Bold | `Ctrl+I` | Italic |
+| `Ctrl+U` | Underline | `Ctrl+P` | Print |
 
 ### Cloud sync
 
@@ -160,7 +177,7 @@ Do not pass the OAuth CMake variables for a normal build — see
 ## Project structure
 
 ```
-src/ui/      Window, tabs, editor, dialogs
+src/ui/      Window, tabs, editors (plain + rich), toolbar, dialogs
 src/core/    Document, file I/O, search
 src/db/      SQLite, notes and links repositories
 src/sync/    OAuth, GitHub and Google Drive sync

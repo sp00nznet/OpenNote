@@ -10,6 +10,10 @@
 #include <shellapi.h>
 #include <shlwapi.h>
 #include <shlobj.h>
+// RichEdit 4.1 (Msftedit.dll). Needed before richedit.h for CHARFORMAT2W,
+// PARAFORMAT2 and EM_SETTEXTMODE, which the rich text view in editor_rich.c
+// uses throughout.
+#define _RICHEDIT_VER 0x0500
 #include <richedit.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +24,7 @@
 
 // Application info
 #define APP_NAME        L"OpenNote"
-#define APP_VERSION     L"1.0.0"
+#define APP_VERSION     L"0.5.0"
 #define APP_CLASS_NAME  L"OpenNoteMainWindow"
 
 // Limits
@@ -34,6 +38,13 @@ typedef enum {
     DOC_TYPE_FILE,      // Regular file from filesystem
     DOC_TYPE_NOTE       // Database note
 } DocumentType;
+
+// How a document's content is stored, and therefore which view edits it.
+// FORMAT_PLAIN is the Scintilla view; FORMAT_RTF is the RichEdit one.
+typedef enum {
+    FORMAT_PLAIN,
+    FORMAT_RTF
+} DocumentFormat;
 
 // Document encoding
 typedef enum {
@@ -53,6 +64,7 @@ typedef struct AppState AppState;
 #include "ui/mainwindow.h"
 #include "ui/tabcontrol.h"
 #include "ui/editor.h"
+#include "ui/editor_rich.h"
 #include "ui/menubar.h"
 #include "ui/statusbar.h"
 #include "ui/dialogs.h"

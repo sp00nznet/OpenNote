@@ -1,5 +1,6 @@
 #include "supernote.h"
 #include "res/resource.h"
+#include "ui/toolbar.h"
 #include <windowsx.h>
 // ponytail: still here for the SCNotification dispatch below -- that is the
 // control's notification protocol, not an editing operation. Every editing
@@ -11,7 +12,7 @@
 // Window procedure forward declaration
 static void OnCreate(HWND hwnd);
 static void OnDestroy(HWND hwnd);
-static void OnNotify(HWND hwnd, int idCtrl, LPNMHDR pnmh);
+static LRESULT OnNotify(HWND hwnd, int idCtrl, LPNMHDR pnmh);
 
 // System tray
 static NOTIFYICONDATAW g_trayIcon = {0};
@@ -105,8 +106,7 @@ LRESULT CALLBACK MainWindow_WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             return 0;
 
         case WM_NOTIFY:
-            OnNotify(hwnd, (int)wParam, (LPNMHDR)lParam);
-            return 0;
+            return OnNotify(hwnd, (int)wParam, (LPNMHDR)lParam);
 
         case WM_DROPFILES:
             {
@@ -122,7 +122,7 @@ LRESULT CALLBACK MainWindow_WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
                             // Open the file in a new tab
                             Document* doc = Document_CreateFromFile(filePath);
                             if (doc) {
-                                int tabIdx = App_CreateTab(doc->title);
+                                int tabIdx = App_CreateTabEx(doc->title, doc->format);
                                 if (tabIdx >= 0 && g_app->tabs[tabIdx]) {
                                     Document_Destroy(g_app->tabs[tabIdx]->document);
                                     g_app->tabs[tabIdx]->document = doc;
@@ -307,6 +307,10 @@ static void OnCreate(HWND hwnd) {
         SendMessageW(g_hNewTabBtn, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), TRUE);
     }
 
+    // Formatting toolbar. Created hidden; it appears when a rich text tab is
+    // active and takes its own strip of the window when it does.
+    FormatBar_Create(hwnd);
+
     // Create status bar
     g_app->hStatusBar = StatusBar_Create(hwnd);
     StatusBar_Show(g_app->showStatusBar);
@@ -366,7 +370,19 @@ static void HandleLinkClick(int position) {
 }
 
 // Handle WM_NOTIFY
-static void OnNotify(HWND hwnd, int idCtrl, LPNMHDR pnmh) {
+static LRESULT OnNotify(HWND hwnd, int idCtrl, LPNMHDR pnmh) {
+    // The formatting toolbar draws its own buttons -- see toolbar.c. This
+    // value has to be returned from the window procedure; DWLP_MSGRESULT is
+    // for dialog procedures and would be ignored here.
+    if (pnmh->code == NM_CUSTOMDRAW && pnmh->hwndFrom == FormatBar_Handle()) {
+        return FormatBar_OnCustomDraw((LPNMTBCUSTOMDRAW)pnmh);
+    }
+
+    // Toolbar tooltips
+    if (pnmh->code == TTN_GETDISPINFOW) {
+        FormatBar_OnGetTooltip((NMTTDISPINFOW*)pnmh);
+        return 0;
+    }
     (void)hwnd;
     (void)idCtrl;
 
@@ -423,15 +439,60 @@ static void OnNotify(HWND hwnd, int idCtrl, LPNMHDR pnmh) {
         }
     }
 
-    // Legacy RichEdit notifications (kept for compatibility)
+    // Rich text view notifications. EN_SELCHANGE is what keeps the formatting
+    // toolbar showing the state of whatever the caret is now sitting in.
     if (pnmh->code == EN_CHANGE || pnmh->code == EN_SELCHANGE) {
         if (tab && pnmh->hwndFrom == tab->hEditor) {
             if (pnmh->code == EN_CHANGE) {
                 PostMessageW(hwnd, WM_APP_DOC_MODIFIED, 0, 0);
             }
+            FormatBar_SyncFromEditor(tab->hEditor);
             PostMessageW(hwnd, WM_APP_UPDATE_STATUS, 0, 0);
         }
     }
+
+    return 0;
+}
+
+// Put a newly created document into a tab.
+//
+// Reuses the current tab when it is empty, unmodified and backed by the right
+// view; otherwise opens a new one. The view check is the part that matters:
+// an .rtf document dropped into a Scintilla tab would show the user its markup
+// instead of the document. Four call sites had this block copied out, and only
+// by having one of them does the check happen everywhere.
+static void OpenDocumentInTab(Document* newDoc) {
+    if (!newDoc) return;
+
+    Tab* tab = App_GetActiveTab();
+    Document* doc = tab ? tab->document : NULL;
+
+    BOOL wantRich = (newDoc->format == FORMAT_RTF);
+    BOOL viewMatches = tab && tab->hEditor &&
+                       (Editor_IsRich(tab->hEditor) == wantRich);
+
+    if (tab && doc && doc->isNew && !doc->modified && viewMatches) {
+        Document_Destroy(doc);
+        tab->document = newDoc;
+        Document_Load(newDoc, tab->hEditor);
+    } else {
+        int idx = App_CreateTabEx(NULL, newDoc->format);
+        if (idx < 0) {
+            Document_Destroy(newDoc);
+            return;
+        }
+        Document_Destroy(g_app->tabs[idx]->document);
+        g_app->tabs[idx]->document = newDoc;
+        Document_Load(newDoc, g_app->tabs[idx]->hEditor);
+    }
+
+    TabControl_UpdateTabTitle(g_app->activeTab);
+    MainWindow_UpdateTitle();
+
+    // The toolbar was last synced against whatever the tab held before; the
+    // document that just loaded has its own fonts and alignment.
+    Tab* active = App_GetActiveTab();
+    if (active && active->hEditor) FormatBar_SyncFromEditor(active->hEditor);
 }
 
 // Handle WM_SIZE
@@ -476,10 +537,20 @@ void MainWindow_OnSize(HWND hwnd, UINT state, int cx, int cy) {
         SetWindowPos(g_hNewTabBtn, HWND_TOP, btnX, 2, btnWidth, tabHeight - 4, 0);
     }
 
-    // Position editor
+    // Formatting toolbar, when a rich text tab is active
     Tab* tab = App_GetActiveTab();
+    FormatBar_UpdateVisibility(tab ? tab->hEditor : NULL);
+
+    int barHeight = FormatBar_Height();
+    if (barHeight > 0) {
+        SetWindowPos(FormatBar_Handle(), NULL, 0, tabHeight, cx, barHeight, SWP_NOZORDER);
+        FormatBar_Layout(cx);
+    }
+
+    // Position editor
     if (tab && tab->hEditor) {
-        SetWindowPos(tab->hEditor, NULL, 0, tabHeight, cx, cy - tabHeight - statusHeight, SWP_NOZORDER);
+        int top = tabHeight + barHeight;
+        SetWindowPos(tab->hEditor, NULL, 0, top, cx, cy - top - statusHeight, SWP_NOZORDER);
     }
 }
 
@@ -518,6 +589,169 @@ BOOL MainWindow_OnQueryEndSession(HWND hwnd) {
 }
 
 // Handle WM_COMMAND
+// Rich text formatting commands, from the toolbar and the Format menu alike.
+// Returns TRUE when the command was one of them and has been dealt with.
+//
+// Every one of these is meaningless without a rich view, so the guard is here
+// once rather than repeated per case.
+static BOOL HandleRichFormatCommand(HWND hwnd, int id, HWND hEditor) {
+    if (!hEditor || !Editor_IsRich(hEditor)) return FALSE;
+
+    switch (id) {
+        case IDM_FORMAT_BOLD:        Rich_ToggleEffect(hEditor, CFE_BOLD);        break;
+        case IDM_FORMAT_ITALIC:      Rich_ToggleEffect(hEditor, CFE_ITALIC);      break;
+        case IDM_FORMAT_UNDERLINE:   Rich_ToggleEffect(hEditor, CFE_UNDERLINE);   break;
+        case IDM_FORMAT_STRIKE:      Rich_ToggleEffect(hEditor, CFE_STRIKEOUT);   break;
+        case IDM_FORMAT_SUPERSCRIPT: Rich_ToggleEffect(hEditor, CFE_SUPERSCRIPT); break;
+        case IDM_FORMAT_SUBSCRIPT:   Rich_ToggleEffect(hEditor, CFE_SUBSCRIPT);   break;
+
+        case IDM_FORMAT_TEXTCOLOR:   Rich_ChooseColor(hEditor, hwnd);             break;
+
+        case IDM_FORMAT_ALIGN_LEFT:    Rich_SetAlignment(hEditor, PFA_LEFT);    break;
+        case IDM_FORMAT_ALIGN_CENTER:  Rich_SetAlignment(hEditor, PFA_CENTER);  break;
+        case IDM_FORMAT_ALIGN_RIGHT:   Rich_SetAlignment(hEditor, PFA_RIGHT);   break;
+        case IDM_FORMAT_ALIGN_JUSTIFY: Rich_SetAlignment(hEditor, PFA_JUSTIFY); break;
+
+        case IDM_FORMAT_BULLETS:
+            Rich_SetListStyle(hEditor,
+                Rich_GetListStyle(hEditor) == PFN_BULLET ? 0 : PFN_BULLET);
+            break;
+
+        case IDM_FORMAT_NUMBERING: {
+            WORD cur = Rich_GetListStyle(hEditor);
+            BOOL numbered = (cur != 0 && cur != PFN_BULLET);
+            Rich_SetListStyle(hEditor, numbered ? 0 : PFN_ARABIC);
+            break;
+        }
+
+        case IDM_FORMAT_INDENT_MORE: Rich_Indent(hEditor, TRUE);  break;
+        case IDM_FORMAT_INDENT_LESS: Rich_Indent(hEditor, FALSE); break;
+
+        case IDM_FORMAT_LINESPACE_1:  Rich_SetLineSpacing(hEditor, 10); break;
+        case IDM_FORMAT_LINESPACE_15: Rich_SetLineSpacing(hEditor, 15); break;
+        case IDM_FORMAT_LINESPACE_2:  Rich_SetLineSpacing(hEditor, 20); break;
+
+        case IDM_FORMAT_CLEAR:       Rich_ClearFormatting(hEditor);  break;
+
+        case IDM_INSERT_PICTURE: {
+            WCHAR path[MAX_PATH] = {0};
+            static const WCHAR filter[] =
+                L"Bitmap Images (*.bmp)\0*.bmp\0All Files (*.*)\0*.*\0";
+            OPENFILENAMEW ofn = {
+                .lStructSize = sizeof(ofn),
+                .hwndOwner = hwnd,
+                .lpstrFilter = filter,
+                .nFilterIndex = 1,
+                .lpstrFile = path,
+                .nMaxFile = MAX_PATH,
+                .Flags = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR
+            };
+            if (GetOpenFileNameW(&ofn)) {
+                if (!Rich_InsertPicture(hEditor, path)) {
+                    MessageBoxW(hwnd,
+                        L"That image could not be inserted.\n\n"
+                        L"Only uncompressed bitmaps are supported for now.",
+                        APP_NAME, MB_ICONWARNING);
+                }
+            }
+            break;
+        }
+
+        default:
+            return FALSE;
+    }
+
+    FormatBar_SyncFromEditor(hEditor);
+    SetFocus(hEditor);
+    return TRUE;
+}
+
+// Page margins, in thousandths of an inch, which is what PAGESETUPDLG uses
+// when PSD_INTHOUSANDTHSOFINCHES is set. One inch all round is what WordPad
+// defaulted to.
+static RECT g_pageMargins = { 1000, 1000, 1000, 1000 };
+
+static void ShowPageSetup(HWND hwnd) {
+    PAGESETUPDLGW psd = {
+        .lStructSize = sizeof(psd),
+        .hwndOwner = hwnd,
+        .Flags = PSD_INTHOUSANDTHSOFINCHES | PSD_MARGINS,
+        .rtMargin = g_pageMargins
+    };
+
+    if (PageSetupDlgW(&psd)) {
+        g_pageMargins = psd.rtMargin;
+    }
+}
+
+// Print a rich text document across as many pages as it needs.
+//
+// EM_FORMATRANGE works in twips against the physical page, and the printable
+// area is inset from it by the hardware margin the printer cannot reach -- so
+// the requested margin is measured from the paper edge, not from wherever the
+// driver happens to start.
+static void PrintRichDocument(HWND hwnd, HWND hEditor, Document* doc) {
+    PRINTDLGW pd = {
+        .lStructSize = sizeof(pd),
+        .hwndOwner = hwnd,
+        .Flags = PD_RETURNDC | PD_NOPAGENUMS | PD_NOSELECTION
+    };
+    if (!PrintDlgW(&pd)) return;
+
+    HDC hDC = pd.hDC;
+
+    int dpiX = GetDeviceCaps(hDC, LOGPIXELSX);
+    int dpiY = GetDeviceCaps(hDC, LOGPIXELSY);
+
+    // Offset of the printable area from the physical paper corner.
+    int offX = GetDeviceCaps(hDC, PHYSICALOFFSETX);
+    int offY = GetDeviceCaps(hDC, PHYSICALOFFSETY);
+
+    int physW = GetDeviceCaps(hDC, PHYSICALWIDTH);
+    int physH = GetDeviceCaps(hDC, PHYSICALHEIGHT);
+
+    // Margins are thousandths of an inch; 1440 twips to the inch.
+    RECT m = g_pageMargins;
+    int leftTw   = MulDiv(m.left,   1440, 1000);
+    int topTw    = MulDiv(m.top,    1440, 1000);
+    int rightTw  = MulDiv(m.right,  1440, 1000);
+    int bottomTw = MulDiv(m.bottom, 1440, 1000);
+
+    int offXTw = MulDiv(offX, 1440, dpiX);
+    int offYTw = MulDiv(offY, 1440, dpiY);
+    int pageWTw = MulDiv(physW, 1440, dpiX);
+    int pageHTw = MulDiv(physH, 1440, dpiY);
+
+    RECT rc;
+    rc.left   = leftTw - offXTw;
+    rc.top    = topTw - offYTw;
+    rc.right  = pageWTw - rightTw - offXTw;
+    rc.bottom = pageHTw - bottomTw - offYTw;
+
+    if (rc.left < 0) rc.left = 0;
+    if (rc.top < 0) rc.top = 0;
+
+    if (rc.right <= rc.left || rc.bottom <= rc.top) {
+        MessageBoxW(hwnd,
+            L"Those margins leave no room to print on this paper size.\n\n"
+            L"Reduce them in Page Setup.",
+            APP_NAME, MB_ICONWARNING);
+        DeleteDC(hDC);
+        return;
+    }
+
+    int pages = Rich_PrintToDC(hEditor, hDC, &rc,
+                               doc ? Document_GetTitle(doc) : L"Document");
+
+    DeleteDC(hDC);
+    if (pd.hDevMode) GlobalFree(pd.hDevMode);
+    if (pd.hDevNames) GlobalFree(pd.hDevNames);
+
+    if (pages == 0) {
+        MessageBoxW(hwnd, L"Nothing was printed.", APP_NAME, MB_ICONWARNING);
+    }
+}
+
 void MainWindow_OnCommand(HWND hwnd, int id, HWND hwndCtl, UINT codeNotify) {
     (void)hwndCtl;
     (void)codeNotify;
@@ -526,11 +760,19 @@ void MainWindow_OnCommand(HWND hwnd, int id, HWND hwndCtl, UINT codeNotify) {
     Document* doc = tab ? tab->document : NULL;
     HWND hEditor = tab ? tab->hEditor : NULL;
 
+    // The formatting toolbar's own combos, then the formatting commands.
+    if (FormatBar_OnCommand(hEditor, id, (int)codeNotify, hwndCtl)) return;
+    if (HandleRichFormatCommand(hwnd, id, hEditor)) return;
+
     switch (id) {
         // File menu
         case IDM_FILE_NEW:
         case IDC_NEW_TAB_BTN:
             App_CreateTab(L"Untitled");
+            break;
+
+        case IDM_FILE_NEW_RICH:
+            App_CreateTabEx(L"Untitled", FORMAT_RTF);
             break;
 
         case IDM_FILE_OPEN:
@@ -540,20 +782,7 @@ void MainWindow_OnCommand(HWND hwnd, int id, HWND hwndCtl, UINT codeNotify) {
                     Document* newDoc = Document_CreateFromFile(path);
                     if (newDoc) {
                         // If current tab is empty and unmodified, reuse it
-                        if (tab && doc && doc->isNew && !doc->modified) {
-                            Document_Destroy(doc);
-                            tab->document = newDoc;
-                            Document_Load(newDoc, hEditor);
-                        } else {
-                            int idx = App_CreateTab(NULL);
-                            if (idx >= 0) {
-                                Document_Destroy(g_app->tabs[idx]->document);
-                                g_app->tabs[idx]->document = newDoc;
-                                Document_Load(newDoc, g_app->tabs[idx]->hEditor);
-                            }
-                        }
-                        TabControl_UpdateTabTitle(g_app->activeTab);
-                        MainWindow_UpdateTitle();
+                        OpenDocumentInTab(newDoc);
                         App_AddRecentFile(path);
                     }
                 }
@@ -566,20 +795,7 @@ void MainWindow_OnCommand(HWND hwnd, int id, HWND hwndCtl, UINT codeNotify) {
                 if (Dialogs_NotesBrowser(hwnd, &noteId) && noteId > 0) {
                     Document* newDoc = Document_CreateFromNote(noteId);
                     if (newDoc) {
-                        if (tab && doc && doc->isNew && !doc->modified) {
-                            Document_Destroy(doc);
-                            tab->document = newDoc;
-                            Document_Load(newDoc, hEditor);
-                        } else {
-                            int idx = App_CreateTab(NULL);
-                            if (idx >= 0) {
-                                Document_Destroy(g_app->tabs[idx]->document);
-                                g_app->tabs[idx]->document = newDoc;
-                                Document_Load(newDoc, g_app->tabs[idx]->hEditor);
-                            }
-                        }
-                        TabControl_UpdateTabTitle(g_app->activeTab);
-                        MainWindow_UpdateTitle();
+                        OpenDocumentInTab(newDoc);
                     }
                 }
             }
@@ -632,7 +848,18 @@ void MainWindow_OnCommand(HWND hwnd, int id, HWND hwndCtl, UINT codeNotify) {
             }
             break;
 
+        case IDM_FILE_PAGE_SETUP:
+            ShowPageSetup(hwnd);
+            break;
+
         case IDM_FILE_PRINT:
+            // The rich view prints itself: the plain path below renders one
+            // page of unformatted text and stops, which would silently drop
+            // both the formatting and everything past page one.
+            if (hEditor && Editor_IsRich(hEditor)) {
+                PrintRichDocument(hwnd, hEditor, doc);
+                break;
+            }
             if (hEditor) {
                 PRINTDLGW pd = {
                     .lStructSize = sizeof(pd),
@@ -892,20 +1119,7 @@ void MainWindow_OnCommand(HWND hwnd, int id, HWND hwndCtl, UINT codeNotify) {
                     if (GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES) {
                         Document* newDoc = Document_CreateFromFile(path);
                         if (newDoc) {
-                            if (tab && doc && doc->isNew && !doc->modified) {
-                                Document_Destroy(doc);
-                                tab->document = newDoc;
-                                Document_Load(newDoc, hEditor);
-                            } else {
-                                int idx = App_CreateTab(NULL);
-                                if (idx >= 0) {
-                                    Document_Destroy(g_app->tabs[idx]->document);
-                                    g_app->tabs[idx]->document = newDoc;
-                                    Document_Load(newDoc, g_app->tabs[idx]->hEditor);
-                                }
-                            }
-                            TabControl_UpdateTabTitle(g_app->activeTab);
-                            MainWindow_UpdateTitle();
+                            OpenDocumentInTab(newDoc);
                             App_AddRecentFile(path);
                         }
                     } else {
