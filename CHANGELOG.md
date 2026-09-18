@@ -5,6 +5,19 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-09-18
+
+### Fixed
+- The `.docx` conformance harness wrote its round-trip output into the directory it was
+  enumerating, which makes `FindNextFile`'s behaviour undefined. Depending on the run it
+  processed a different number of documents, and on a second run it would treat its own
+  output as corpus input. It now lists the corpus before writing anything and puts the
+  output in a separate `out` directory, so repeat runs give the same count.
+
+  Found by running the published v0.6.0 binary against a freshly generated corpus, which
+  reported fewer documents than the same binary did locally. A harness that quietly
+  changes what it checks is worth less than no harness.
+
 ## [0.6.0] - 2026-09-18
 
 **Word documents.** OpenNote reads and writes `.docx` — ECMA-376 WordprocessingML —

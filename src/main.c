@@ -120,28 +120,49 @@ static int RunDocxCheck(int argc, WCHAR** argv) {
         return 2;
     }
 
+    // The whole corpus is listed before anything is written, and the round trip
+    // output goes to a separate directory. Writing into the directory being
+    // enumerated makes FindNextFile's behaviour undefined -- it silently
+    // processed a different number of documents depending on the run.
+    #define MAX_CORPUS 256
+    static WCHAR names[MAX_CORPUS][MAX_PATH];
+    int fileCount = 0;
+
     WCHAR pattern[MAX_PATH];
     swprintf_s(pattern, MAX_PATH, L"%s\\*.docx", argv[2]);
 
     WIN32_FIND_DATAW fd;
     HANDLE find = FindFirstFileW(pattern, &fd);
-    if (find == INVALID_HANDLE_VALUE) {
+    if (find != INVALID_HANDLE_VALUE) {
+        do {
+            if (fileCount >= MAX_CORPUS) break;
+            wcscpy_s(names[fileCount++], MAX_PATH, fd.cFileName);
+        } while (FindNextFileW(find, &fd));
+        FindClose(find);
+    }
+
+    if (fileCount == 0) {
         wprintf(L"no .docx files in %s -- nothing to check\n", argv[2]);
         wprintf(L"generate the corpus with: py tests\\make_fixtures.py <dir>\n");
         return 0;   // a missing corpus is a skip, not a failure
     }
 
+    WCHAR outDir[MAX_PATH];
+    swprintf_s(outDir, MAX_PATH, L"%s\\out", argv[2]);
+    CreateDirectoryW(outDir, NULL);
+
     int files = 0, checks = 0, failures = 0;
 
-    do {
+    for (int fi = 0; fi < fileCount; fi++) {
+        const WCHAR* fileName = names[fi];
         files++;
 
         WCHAR docPath[MAX_PATH];
-        swprintf_s(docPath, MAX_PATH, L"%s\\%s", argv[2], fd.cFileName);
+        swprintf_s(docPath, MAX_PATH, L"%s\\%s", argv[2], fileName);
 
         char* rtf = Docx_ReadToRtf(docPath);
         if (!rtf) {
-            wprintf(L"FAIL  %s: %s\n", fd.cFileName, Docx_GetLastError());
+            wprintf(L"FAIL  %s: %s\n", fileName, Docx_GetLastError());
             failures++;
             continue;
         }
@@ -149,7 +170,7 @@ static int RunDocxCheck(int argc, WCHAR** argv) {
         // Structural checks every converted document must satisfy.
         checks++;
         if (strncmp(rtf, "{\\rtf", 5) != 0) {
-            wprintf(L"FAIL  %s: output is not RTF\n", fd.cFileName);
+            wprintf(L"FAIL  %s: output is not RTF\n", fileName);
             failures++;
         }
 
@@ -162,7 +183,7 @@ static int RunDocxCheck(int argc, WCHAR** argv) {
             else if (*c == '}' && --depth < 0) { balanced = FALSE; break; }
         }
         if (!balanced || depth != 0) {
-            wprintf(L"FAIL  %s: unbalanced RTF groups (depth %d)\n", fd.cFileName, depth);
+            wprintf(L"FAIL  %s: unbalanced RTF groups (depth %d)\n", fileName, depth);
             failures++;
         }
 
@@ -193,7 +214,7 @@ static int RunDocxCheck(int argc, WCHAR** argv) {
                 checks++;
                 BOOL found = strstr(rtf, needle) != NULL;
                 if (found != wantPresent) {
-                    wprintf(L"FAIL  %s: expected %s \"%hs\"\n", fd.cFileName,
+                    wprintf(L"FAIL  %s: expected %s \"%hs\"\n", fileName,
                             wantPresent ? L"to contain" : L"NOT to contain", needle);
                     failures++;
                 }
@@ -214,7 +235,7 @@ static int RunDocxCheck(int argc, WCHAR** argv) {
             // Silently skipping here would let the writer go unchecked while
             // the harness still reported success.
             wprintf(L"FAIL  %s: could not create a control for the round trip\n",
-                    fd.cFileName);
+                    fileName);
             checks++;
             failures++;
         }
@@ -223,21 +244,21 @@ static int RunDocxCheck(int argc, WCHAR** argv) {
             SendMessageW(rt, EM_EXLIMITTEXT, 0, 0x7FFFFFFF);
 
             WCHAR outPath[MAX_PATH];
-            swprintf_s(outPath, MAX_PATH, L"%s\\%s.out.docx", argv[2], fd.cFileName);
+            swprintf_s(outPath, MAX_PATH, L"%s\\%s.out.docx", outDir, fileName);
 
             checks++;
             if (!Rich_SetRtf(rt, rtf)) {
                 wprintf(L"FAIL  %s: converted RTF was rejected by the control\n",
-                        fd.cFileName);
+                        fileName);
                 failures++;
             } else if (!Docx_WriteFromEditor(rt, outPath)) {
-                wprintf(L"FAIL  %s: could not be written back as .docx\n", fd.cFileName);
+                wprintf(L"FAIL  %s: could not be written back as .docx\n", fileName);
                 failures++;
             } else {
                 char* again = Docx_ReadToRtf(outPath);
                 if (!again) {
                     wprintf(L"FAIL  %s: the written .docx could not be read back\n",
-                            fd.cFileName);
+                            fileName);
                     failures++;
                 } else {
                     // Text has to survive the round trip. Formatting fidelity is
@@ -263,7 +284,7 @@ static int RunDocxCheck(int argc, WCHAR** argv) {
                         checks++;
                         if (!after || !SameContent(before, after)) {
                             wprintf(L"FAIL  %s: text was lost across the .docx round trip\n",
-                                    fd.cFileName);
+                                    fileName);
                             failures++;
                         }
                         free(after);
@@ -277,9 +298,7 @@ static int RunDocxCheck(int argc, WCHAR** argv) {
         }
 
         free(rtf);
-    } while (FindNextFileW(find, &fd));
-
-    FindClose(find);
+    }
 
     wprintf(L"\ndocx conformance: %d/%d checks passed across %d documents\n",
             checks - failures, checks, files);

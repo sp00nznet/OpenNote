@@ -28,7 +28,7 @@ payware, read the published spec it is hiding behind, give it away.
 
 ## Status
 
-**v0.6.0 — alpha. Reads and writes `.docx`.** Downloads are on the
+**v0.6.1 — alpha. Reads and writes `.docx`.** Downloads are on the
 [releases page](https://github.com/sp00nznet/opennote/releases/latest): a bare executable
 and an installer, with the release notes saying what each one does and does not give you.
 
@@ -207,7 +207,7 @@ documents:
 ```powershell
 python tests/make_fixtures.py build/corpus     # build the corpus
 .\build\bin\OpenNote.exe --docx-check build/corpus
-python tests/validate_docx.py build/corpus     # check what the writer produced
+python tests/validate_docx.py build/corpus/out # check what the writer produced
 ```
 
 Each document has a `.expect` file listing what the converted RTF must and must not

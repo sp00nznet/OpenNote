@@ -63,7 +63,7 @@ jobs:
       # This checks the same packages with tools that are not OpenNote, so a
       # file only its own reader accepts does not pass.
       - name: Validate written packages
-        run: python tests/validate_docx.py build/corpus
+        run: python tests/validate_docx.py build/corpus/out
 
       # The tag drives the installer's version so it cannot drift from what shipped.
       # Untagged builds are 0.0.0 rather than a number that looks like a release.
