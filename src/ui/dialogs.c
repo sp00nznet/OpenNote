@@ -201,7 +201,8 @@ BOOL Dialogs_OpenFile(HWND hParent, WCHAR* pathBuffer, int bufferSize) {
 
     // Comprehensive file filter like Notepad++
     static const WCHAR filter[] =
-        L"All Supported Files\0*.rtf;*.txt;*.c;*.cpp;*.h;*.hpp;*.cs;*.java;*.py;*.js;*.ts;*.json;*.xml;*.html;*.htm;*.css;*.md;*.yaml;*.yml;*.ini;*.cfg;*.conf;*.log;*.sql;*.sh;*.bat;*.cmd;*.ps1;*.rb;*.php;*.go;*.rs;*.swift;*.kt;*.lua;*.pl;*.r;*.m;*.asm;*.s\0"
+        L"All Supported Files\0*.docx;*.rtf;*.txt;*.c;*.cpp;*.h;*.hpp;*.cs;*.java;*.py;*.js;*.ts;*.json;*.xml;*.html;*.htm;*.css;*.md;*.yaml;*.yml;*.ini;*.cfg;*.conf;*.log;*.sql;*.sh;*.bat;*.cmd;*.ps1;*.rb;*.php;*.go;*.rs;*.swift;*.kt;*.lua;*.pl;*.r;*.m;*.asm;*.s\0"
+        L"Word Document (*.docx)\0*.docx\0"
         L"Rich Text Format (*.rtf)\0*.rtf\0"
         L"Text Files (*.txt)\0*.txt\0"
         L"C/C++ Files (*.c;*.cpp;*.h;*.hpp)\0*.c;*.cpp;*.h;*.hpp\0"
@@ -283,6 +284,9 @@ BOOL Dialogs_SaveFile(HWND hParent, WCHAR* pathBuffer, int bufferSize, const WCH
             } else if (_wcsicmp(ext, L"rtf") == 0) {
                 filterIndex = 11;
                 defExt = L"rtf";
+            } else if (_wcsicmp(ext, L"docx") == 0) {
+                filterIndex = 12;
+                defExt = L"docx";
             }
         }
     }
@@ -299,6 +303,7 @@ BOOL Dialogs_SaveFile(HWND hParent, WCHAR* pathBuffer, int bufferSize, const WCH
         L"XML Files (*.xml)\0*.xml\0"
         L"SQL Files (*.sql)\0*.sql\0"
         L"Rich Text Format (*.rtf)\0*.rtf\0"
+        L"Word Document (*.docx)\0*.docx\0"
         L"All Files (*.*)\0*.*\0";
 
     OPENFILENAMEW ofn = {

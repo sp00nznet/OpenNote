@@ -5,6 +5,63 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-09-18
+
+**Word documents.** OpenNote reads and writes `.docx` — ECMA-376 WordprocessingML —
+with no new dependency, because Windows already ships an API for Open Packaging
+Conventions containers and a pull XML reader.
+
+### Added
+- **`.docx` reading.** The package is opened with `IOpcFactory` and the main document
+  part located through its `officeDocument` relationship rather than a hardcoded path.
+  `IXmlReader` walks the XML. Supported: character formatting (bold, italic, underline,
+  strikethrough, colour, size, font, super/subscript), paragraph formatting (alignment,
+  indent, spacing, lists), heading styles, tables with cell widths taken from
+  `w:tblGrid`, tabs, line breaks, and Unicode.
+- **Tracked deletions are honoured** — content inside `w:del` is revision history and
+  does not appear in the document.
+- **`.docx` writing.** The document is read back out of the rich text view and emitted as
+  WordprocessingML into an OPC package. The Save As dialog's file type decides whether a
+  rich document is stored as `.rtf` or `.docx`.
+- **A conformance harness**, per the house rules. `OpenNote.exe --docx-check <dir>`
+  converts every document in a corpus, checks the assertions in its `.expect` sidecar,
+  writes it back out as `.docx`, re-reads it and asserts no text was lost. It reports a
+  pass/fail count and exits non-zero on regression. CI runs it on every build; the
+  current figure is in the README.
+- **The corpus is generated, not committed** — `tests/make_fixtures.py` builds it, so the
+  repository carries no binary Office documents.
+- **`tests/validate_docx.py`** checks the packages the writer produced using Python's
+  zipfile and XML parser, so a file only OpenNote's own reader accepts does not pass.
+- `OpenNote.exe --docx2rtf <file.docx>` prints the converted RTF, for looking at when a
+  document comes out wrong.
+
+### Fixed
+- The writer emitted RichEdit's internal table markers (U+FFF9..U+FFFC) and cell
+  separators into the document as literal text. They are structure, not content; cell
+  breaks now become tabs and row breaks become line breaks.
+- A `Heading` style lost its weight and size the moment the paragraph's first run opened,
+  because runs reset their formatting to nothing rather than to what the paragraph style
+  implied.
+- Table cells carried a paragraph mark as well as their cell terminator, leaving a blank
+  line in every cell. Cell edges were also emitted after the row's content instead of
+  before it, and ignored `w:tblGrid`.
+- `Rich_EnsureLoaded` is now public. The `.docx` self-check created a RichEdit control
+  directly and only worked because an earlier check happened to have loaded the library
+  first; the conformance harness, which runs on its own, did not. It silently skipped its
+  round-trip checks rather than reporting them — a harness that skips quietly is worse
+  than one that fails.
+
+### Known issues
+- Tables read correctly but flatten to tab-separated text when written back to `.docx`.
+  Rebuilding the grid on write needs the table model the layout engine brings in v0.7.
+  Text is never lost, and the harness enforces that.
+- Numbered lists are read as bulleted. Which marker a list uses lives in `numbering.xml`
+  behind two levels of indirection, which is not yet followed.
+- Styles are not resolved from `styles.xml`; heading levels are given the shape readers
+  expect rather than the document's own definition.
+- Images inside a `.docx` are not yet read.
+- Legacy binary `.doc` is a different format ([MS-DOC] over [MS-CFB]) and is not claimed.
+
 ## [0.5.0] - 2026-09-18
 
 **The WordPad replacement.** Windows 11 24H2 removed WordPad; this is the milestone that

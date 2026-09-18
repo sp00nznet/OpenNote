@@ -28,12 +28,27 @@ payware, read the published spec it is hiding behind, give it away.
 
 ## Status
 
-**v0.5.0 — alpha, and the WordPad milestone is reached.** Downloads are on the
+**v0.6.0 — alpha. Reads and writes `.docx`.** Downloads are on the
 [releases page](https://github.com/sp00nznet/opennote/releases/latest): a bare executable
 and an installer, with the release notes saying what each one does and does not give you.
 
 Three security issues are known and documented in [SECURITY.md](SECURITY.md). A build
 made from source without the optional OAuth variables is not affected by any of them.
+
+### Word documents
+
+As of v0.6.0 OpenNote opens and saves **`.docx`** — ECMA-376 WordprocessingML.
+Formatting, alignment, lists, indents, tables, tracked-deletion handling and Unicode all
+come through. There is no new dependency: a `.docx` is an Open Packaging Conventions
+container, and Windows ships the API for exactly that shape (`IOpcFactory`) alongside a
+pull XML reader (`IXmlReader`). The container and the parser were never this project's
+code to own.
+
+**Conformance:** `54/54 checks across 5 documents` — see [Conformance](#conformance) below.
+
+Tables are read into the document but flatten to tab-separated text when saving back to
+`.docx`; rebuilding the grid on write needs the table model the layout engine brings in
+v0.7. Text is never lost, and the harness enforces that.
 
 ### The WordPad replacement
 
@@ -116,6 +131,7 @@ From a clean machine:
 OpenNote.exe                 # empty tab
 OpenNote.exe notes.txt       # open a file in a tab
 OpenNote.exe report.rtf      # open a rich text document
+OpenNote.exe report.docx     # open a Word document
 OpenNote.exe --selftest      # run the built-in checks and exit
 ```
 
@@ -123,6 +139,7 @@ OpenNote.exe --selftest      # run the built-in checks and exit
 
 | | |
 |---|---|
+| **Word documents** | `.docx` read and write — ECMA-376, via Windows' own packaging API |
 | **Rich text** | `.rtf` documents: fonts, colours, alignment, lists, indent, pictures, printing |
 | **Tabs** | Several documents at once, with the session restored on next launch |
 | **Syntax highlighting** | Via Scintilla — 100+ languages |
@@ -174,11 +191,42 @@ Do not pass the OAuth CMake variables for a normal build — see
 
 ---
 
+## Conformance
+
+`.docx` reading is checked against a corpus on every build, and the count is reported
+rather than a bare "tests passed":
+
+```
+> OpenNote.exe --docx-check build/corpus
+docx conformance: 54/54 checks across 5 documents
+```
+
+The corpus is **generated, not committed**, so the repository carries no binary Office
+documents:
+
+```powershell
+python tests/make_fixtures.py build/corpus     # build the corpus
+.\build\bin\OpenNote.exe --docx-check build/corpus
+python tests/validate_docx.py build/corpus     # check what the writer produced
+```
+
+Each document has a `.expect` file listing what the converted RTF must and must not
+contain — that a tracked deletion is absent, that a heading keeps its weight, that cell
+edges come from `w:tblGrid`, that non-ASCII survives as `\uN`. Every document is also
+written back out as `.docx` and re-read, asserting no text is lost, and
+`tests/validate_docx.py` then checks those packages with Python rather than with
+OpenNote's own reader.
+
+`--docx2rtf <file.docx>` prints the converted RTF, which is the thing to look at when a
+document comes out wrong.
+
+---
+
 ## Project structure
 
 ```
 src/ui/      Window, tabs, editors (plain + rich), toolbar, dialogs
-src/core/    Document, file I/O, search
+src/core/    Document, file I/O, search, .docx
 src/db/      SQLite, notes and links repositories
 src/sync/    OAuth, GitHub and Google Drive sync
 res/         Icons, dialogs, manifest

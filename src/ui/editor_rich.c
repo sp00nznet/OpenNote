@@ -22,11 +22,13 @@
 // the control class it registers must outlive every editor window.
 static HMODULE g_richEditLib = NULL;
 
-static BOOL EnsureRichEditLoaded(void) {
+BOOL Rich_EnsureLoaded(void) {
     if (g_richEditLib) return TRUE;
     g_richEditLib = LoadLibraryW(L"Msftedit.dll");
     return g_richEditLib != NULL;
 }
+
+#define EnsureRichEditLoaded Rich_EnsureLoaded
 
 // ---------------------------------------------------------------------------
 // Creation

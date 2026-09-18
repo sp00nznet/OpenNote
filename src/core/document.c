@@ -3,16 +3,17 @@
 
 // Which view a file wants, decided by extension.
 //
-// Only .rtf opens in the rich view. WordPad also opened .doc and .docx, and
-// those arrive in v0.6 with a real reader behind them -- claiming them now
-// would mean opening a document and silently showing the user nothing.
+// .rtf and .docx open in the rich view. Legacy binary .doc is a different
+// format entirely ([MS-DOC] over [MS-CFB]) and is not claimed here -- opening
+// one and showing the user nothing would be worse than not offering.
 DocumentFormat Document_FormatForPath(const WCHAR* path) {
     if (!path) return FORMAT_PLAIN;
 
     const WCHAR* ext = wcsrchr(path, L'.');
     if (!ext) return FORMAT_PLAIN;
 
-    if (_wcsicmp(ext, L".rtf") == 0) return FORMAT_RTF;
+    if (_wcsicmp(ext, L".rtf") == 0)  return FORMAT_RTF;
+    if (_wcsicmp(ext, L".docx") == 0) return FORMAT_DOCX;
     return FORMAT_PLAIN;
 }
 
@@ -45,7 +46,7 @@ Document* Document_CreateFromFile(const WCHAR* path) {
     // Also create a note entry so it appears in Notes Browser. For an RTF file
     // the markup itself is not what anyone wants to full-text search, so the
     // note gets the text and the file keeps the formatting.
-    if (Database_IsOpen() && doc->format == FORMAT_PLAIN) {
+    if (Database_IsOpen() && !FORMAT_IS_RICH(doc->format)) {
         // Read file content to store in database
         TextEncoding encoding = ENCODING_UTF8;
         WCHAR* content = FileIO_ReadFile(path, &encoding);
@@ -89,7 +90,7 @@ BOOL Document_Save(Document* doc, HWND hEditor) {
     // An RTF document is written by the control, not by FileIO: passing it
     // through Editor_GetText would save the plain text and throw away every
     // bit of formatting the user just applied.
-    if (doc->format == FORMAT_RTF && doc->type == DOC_TYPE_FILE) {
+    if (FORMAT_IS_RICH(doc->format) && doc->type == DOC_TYPE_FILE) {
         if (doc->isNew || !doc->filePath[0]) {
             WCHAR path[MAX_PATH] = {0};
             if (Dialogs_SaveFile(g_app->hMainWindow, path, MAX_PATH, doc->title)) {
@@ -98,7 +99,14 @@ BOOL Document_Save(Document* doc, HWND hEditor) {
             return FALSE;
         }
 
-        if (!Rich_SaveRtfFile(hEditor, doc->filePath)) return FALSE;
+        BOOL saved = (doc->format == FORMAT_DOCX)
+            ? Docx_WriteFromEditor(hEditor, doc->filePath)
+            : Rich_SaveRtfFile(hEditor, doc->filePath);
+
+        if (!saved) {
+            MessageBoxW(g_app->hMainWindow, Docx_GetLastError(), APP_NAME, MB_ICONERROR);
+            return FALSE;
+        }
 
         doc->modified = FALSE;
         Editor_SetModified(hEditor, FALSE);
@@ -160,10 +168,22 @@ BOOL Document_SaveAs(Document* doc, HWND hEditor, const WCHAR* path) {
     // Saving a rich document under a name that is not .rtf would quietly drop
     // its formatting, so the format follows the view rather than the extension.
     if (Editor_IsRich(hEditor)) {
-        if (!Rich_SaveRtfFile(hEditor, path)) return FALSE;
+        // The name chosen in the Save As dialog decides the storage format --
+        // that is the one place the user says which they want.
+        DocumentFormat want = Document_FormatForPath(path);
+        if (!FORMAT_IS_RICH(want)) want = FORMAT_RTF;
+
+        BOOL saved = (want == FORMAT_DOCX)
+            ? Docx_WriteFromEditor(hEditor, path)
+            : Rich_SaveRtfFile(hEditor, path);
+
+        if (!saved) {
+            MessageBoxW(g_app->hMainWindow, Docx_GetLastError(), APP_NAME, MB_ICONERROR);
+            return FALSE;
+        }
 
         doc->type = DOC_TYPE_FILE;
-        doc->format = FORMAT_RTF;
+        doc->format = want;
         doc->isNew = FALSE;
         doc->modified = FALSE;
         wcscpy_s(doc->filePath, MAX_PATH, path);
@@ -235,6 +255,21 @@ BOOL Document_Load(Document* doc, HWND hEditor) {
 
     if (doc->format == FORMAT_RTF) {
         if (!Rich_LoadRtfFile(hEditor, doc->filePath)) return FALSE;
+        doc->modified = FALSE;
+        return TRUE;
+    }
+
+    if (doc->format == FORMAT_DOCX) {
+        // WordprocessingML is converted to RTF and handed to the same view --
+        // see docx.h for why.
+        char* rtf = Docx_ReadToRtf(doc->filePath);
+        if (!rtf) {
+            MessageBoxW(g_app->hMainWindow, Docx_GetLastError(), APP_NAME, MB_ICONWARNING);
+            return FALSE;
+        }
+        BOOL ok = Rich_SetRtf(hEditor, rtf);
+        free(rtf);
+        if (!ok) return FALSE;
         doc->modified = FALSE;
         return TRUE;
     }

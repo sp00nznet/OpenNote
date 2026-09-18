@@ -315,7 +315,7 @@ int App_CreateTabEx(const WCHAR* title, DocumentFormat format) {
     // Auto-create note in database for persistence. A rich document is not
     // backed by a note: the notes table stores text, and storing RTF markup in
     // it would put braces and control words into full-text search results.
-    if (Database_IsOpen() && format == FORMAT_PLAIN) {
+    if (Database_IsOpen() && !FORMAT_IS_RICH(format)) {
         const WCHAR* noteTitle = title ? title : L"Untitled";
         int noteId = Notes_Create(noteTitle, L"");
         if (noteId > 0) {
@@ -334,7 +334,7 @@ int App_CreateTabEx(const WCHAR* title, DocumentFormat format) {
     }
 
     // Create the view the format calls for.
-    tab->hEditor = (format == FORMAT_RTF)
+    tab->hEditor = FORMAT_IS_RICH(format)
         ? Editor_CreateRich(g_app->hMainWindow)
         : Editor_Create(g_app->hMainWindow);
     if (!tab->hEditor) {
@@ -347,7 +347,7 @@ int App_CreateTabEx(const WCHAR* title, DocumentFormat format) {
     // Apply user settings. The editor font, word wrap and tab size are plain
     // text concerns -- a rich document carries its own fonts, and forcing the
     // code font over the whole thing would flatten every document it opened.
-    if (format == FORMAT_PLAIN) {
+    if (!FORMAT_IS_RICH(format)) {
         Editor_SetFont(tab->hEditor, g_app->hEditorFont);
         Editor_SetWordWrap(tab->hEditor, g_app->wordWrap);
         Editor_SetTabSize(tab->hEditor, g_app->tabSize);

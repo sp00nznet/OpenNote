@@ -467,7 +467,7 @@ static void OpenDocumentInTab(Document* newDoc) {
     Tab* tab = App_GetActiveTab();
     Document* doc = tab ? tab->document : NULL;
 
-    BOOL wantRich = (newDoc->format == FORMAT_RTF);
+    BOOL wantRich = FORMAT_IS_RICH(newDoc->format);
     BOOL viewMatches = tab && tab->hEditor &&
                        (Editor_IsRich(tab->hEditor) == wantRich);
 

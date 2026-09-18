@@ -8,6 +8,11 @@
 // editor.c should not reach for them directly -- Editor_* dispatches here when
 // the HWND is a rich view. See ROADMAP.md v0.5.
 
+// Loads Msftedit.dll and registers the control class. Rich_Create does this
+// itself; callers that create a RichEdit window directly must call it first or
+// CreateWindowEx fails with an unregistered class.
+BOOL Rich_EnsureLoaded(void);
+
 HWND Rich_Create(HWND hParent);
 
 // Text

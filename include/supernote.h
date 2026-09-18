@@ -24,7 +24,7 @@
 
 // Application info
 #define APP_NAME        L"OpenNote"
-#define APP_VERSION     L"0.5.0"
+#define APP_VERSION     L"0.6.0"
 #define APP_CLASS_NAME  L"OpenNoteMainWindow"
 
 // Limits
@@ -43,8 +43,12 @@ typedef enum {
 // FORMAT_PLAIN is the Scintilla view; FORMAT_RTF is the RichEdit one.
 typedef enum {
     FORMAT_PLAIN,
-    FORMAT_RTF
+    FORMAT_RTF,
+    FORMAT_DOCX
 } DocumentFormat;
+
+// Both rich formats are edited in the same view; only their storage differs.
+#define FORMAT_IS_RICH(f) ((f) == FORMAT_RTF || (f) == FORMAT_DOCX)
 
 // Document encoding
 typedef enum {
@@ -69,6 +73,7 @@ typedef struct AppState AppState;
 #include "ui/statusbar.h"
 #include "ui/dialogs.h"
 #include "core/document.h"
+#include "core/docx.h"
 #include "core/fileio.h"
 #include "core/search.h"
 #include "db/database.h"

@@ -48,6 +48,7 @@ set(SUPERNOTE_SOURCES
     src/core/document.c
     src/core/fileio.c
     src/core/search.c
+    src/core/docx.c
     src/db/database.c
     src/db/notes_repo.c
     src/db/links_repo.c
@@ -96,6 +97,7 @@ target_link_libraries(OpenNote PRIVATE
     ws2_32
     crypt32
     bcrypt
+    xmllite
 )
 
 target_compile_definitions(OpenNote PRIVATE

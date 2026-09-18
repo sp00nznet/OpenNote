@@ -6,8 +6,8 @@ The short version: **Windows shipped a rich text editor for thirty years and rem
 in 2024.** WordPad is gone from Windows 11 24H2 and from Windows Server 2025. The
 replacement Microsoft points you at is a subscription. OpenNote is aiming at that hole.
 
-**v0.5.0 is released**, and with it the first published binaries: a bare executable and
-an installer, built by CI from the tagged commit.
+**v0.6.0 is released.** Published binaries — a bare executable and an installer — are
+built by CI from the tagged commit.
 
 Nothing below is a promise of a date.
 
@@ -82,13 +82,28 @@ still recent. RichEdit's ceiling is real — weak tables, no true pagination, an
 that cannot be turned off without a page width to wrap to — and the upgrade path is the
 DirectWrite engine in v0.6.0.
 
-## v0.6.0 and beyond — Word
+## v0.6.0 — `.docx` — **done**
 
-- [ ] `.docx` read and write (ECMA-376). Forces a real layout engine
+This version originally bundled `.docx`, a layout engine and `.doc` together. That was
+three separate efforts in one entry, so they are now three versions.
+
+- [x] `.docx` reading — ECMA-376, via `IOpcFactory` and `IXmlReader`
+- [x] `.docx` writing, with the Save As file type choosing the storage format
+- [x] Conformance harness with a pass/fail count, run in CI, figure in the README
+- [x] Corpus generated rather than committed
+- [ ] `styles.xml` resolution, `numbering.xml` list markers, images
+
+## v0.7.0 — The layout engine
+
 - [ ] DirectWrite layout engine — pagination, floats, text wrap, proper tables
+- [ ] Real table support on write, which needs that table model
+- [ ] Ruler and tab stops
+- [ ] Print-to-PDF export via the in-box PDF printer
+
+## v0.8.0 and beyond — `.doc`, and the rest of Word
+
 - [ ] `.doc` read and write — [MS-DOC] over [MS-CFB]. Twenty-five years of files that
       nothing free reads well, and the last in-box reader left with WordPad
-- [ ] Print-to-PDF export via the in-box PDF printer
 - [ ] Track changes, comments, footnotes, table of contents
 
 Everything needed for the layout is already in Windows and already paid for: DirectWrite

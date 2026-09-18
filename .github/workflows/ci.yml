@@ -50,6 +50,21 @@ jobs:
       - name: Self-test
         run: .\build\bin\OpenNote.exe --selftest
 
+      # The .docx conformance corpus is generated rather than committed, so the
+      # repository carries no binary Office documents. The harness reports a
+      # pass/fail count and exits non-zero on any regression.
+      - name: Generate .docx corpus
+        run: python tests/make_fixtures.py build/corpus
+
+      - name: docx conformance
+        run: .\build\bin\OpenNote.exe --docx-check build/corpus
+
+      # The harness above reads back what it wrote with OpenNote's own reader.
+      # This checks the same packages with tools that are not OpenNote, so a
+      # file only its own reader accepts does not pass.
+      - name: Validate written packages
+        run: python tests/validate_docx.py build/corpus
+
       # The tag drives the installer's version so it cannot drift from what shipped.
       # Untagged builds are 0.0.0 rather than a number that looks like a release.
       - name: Derive version
